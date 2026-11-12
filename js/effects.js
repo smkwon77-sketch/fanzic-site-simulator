@@ -47,15 +47,16 @@ window.FZ = window.FZ || {};
           out.addScaledVector(tmp, kRoof * S * 1.6 * this.sinkW / r * (this.R * this.R) / (r * r + this.R * this.R));
         } else if (pl.flow === 'jet') {
           tmp.negate();
-          const al = tmp.dot(pl.dir);
+          const fd = pl.fdir || pl.dir;
+          const al = tmp.dot(fd);
           if (al > -0.5) {
             const lat2 = tmp.lengthSq() - al * al;
             const w = pl.p.size * 0.8 + Math.max(0, al) * 0.18;
-            out.addScaledVector(pl.dir, S * 1.3 * Math.exp(-lat2 / (w * w)) / (1 + Math.max(0, al) / (this.L * 0.25)));
+            out.addScaledVector(fd, S * 1.3 * Math.exp(-lat2 / (w * w)) / (1 + Math.max(0, al) / (this.L * 0.25)));
           }
         } else if (pl.flow === 'down') {
           const dx = p.x - pl.pos.x, dz = p.z - pl.pos.z, rh = Math.hypot(dx, dz) + 0.01;
-          const R = pl.kind === 'hvls' ? pl.p.size * 0.75 : 1.4;
+          const R = pl.kind === 'hvls' ? pl.p.size * 0.75 : Math.max(1.4, pl.p.size * 3);
           if (p.y < pl.pos.y) {
             out.y -= S * 1.1 * Math.exp(-(rh * rh) / (R * R));
             const nearFloor = Math.max(0, 1 - p.y / 1.8);
@@ -79,11 +80,18 @@ window.FZ = window.FZ || {};
       const geo = new T.BufferGeometry();
       this.pos = new Float32Array(n * 3); this.col = new Float32Array(n * 3);
       this.age = new Float32Array(n); this.life = new Float32Array(n);
+      this.kind = new Uint8Array(n); this.src = new Int16Array(n);
+      this.intakes = field.pls.filter(p => p.mode === 'intake' && p.out);
+      this.exhausts = field.pls.filter(p => p.mode === 'exhaust' && p.out);
+      for (let i = 0; i < n; i++) {
+        if (this.intakes.length && i < n * 0.3) this.kind[i] = 1;
+        else if (this.exhausts.length && i >= n * 0.3 && i < n * 0.5) this.kind[i] = 2;
+      }
       geo.setAttribute('position', new T.BufferAttribute(this.pos, 3));
       geo.setAttribute('color', new T.BufferAttribute(this.col, 3));
       const tex = (() => { const c = document.createElement('canvas'); c.width = c.height = 32; const x = c.getContext('2d'); const g = x.createRadialGradient(16, 16, 0, 16, 16, 16); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.4, 'rgba(255,255,255,0.6)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 32, 32); return new T.CanvasTexture(c); })();
       const sz = Math.max(0.28, Math.max(site.dims.L, site.dims.W) * 0.011);
-      this.mat = new T.PointsMaterial({ size: sz, map: tex, vertexColors: true, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: 0.95 });
+      this.mat = new T.PointsMaterial({ size: sz * 1.35, map: tex, vertexColors: true, transparent: true, depthWrite: false, alphaTest: 0.05, opacity: 0.9 });
       this.points = new T.Points(geo, this.mat);
       this.points.frustumCulled = false;
       scene.add(this.points);
@@ -92,6 +100,19 @@ window.FZ = window.FZ || {};
     }
     spawn(i, init) {
       const { L, W, H } = this.site.dims;
+      const kd = this.kind[i];
+      if (kd) {
+        const list = kd === 1 ? this.intakes : this.exhausts;
+        const j = Math.floor(Math.random() * list.length), pl = list[j];
+        this.src[i] = j;
+        const s = pl.p.size, r = () => (Math.random() - 0.5) * s * 1.4;
+        const d = kd === 1 ? 1.2 + Math.random() * 3 : 0.3 + Math.random() * 0.4;
+        this.pos[i * 3] = pl.pos.x + pl.out.x * d + r() * (1 - Math.abs(pl.out.x));
+        this.pos[i * 3 + 1] = pl.pos.y + pl.out.y * d + r() * (1 - Math.abs(pl.out.y));
+        this.pos[i * 3 + 2] = pl.pos.z + pl.out.z * d + r() * (1 - Math.abs(pl.out.z));
+        this.age[i] = init ? Math.random() * 2 : 0; this.life[i] = kd === 1 ? 3 + Math.random() * 3 : 1.6 + Math.random() * 1.6;
+        return;
+      }
       const inl = this.site.inlets || [];
       // 사람·가축이 있는 바닥 근처 기류가 잘 보이도록 낮은 높이에 더 많이 생성
       let x = (Math.random() - 0.5) * L * 0.98, y = 0.2 + Math.pow(Math.random(), 1.7) * (H - 0.4), z = (Math.random() - 0.5) * W * 0.98;
@@ -105,9 +126,32 @@ window.FZ = window.FZ || {};
     update(dt, on, t, colorFn) {
       const { L, W, H } = this.site.dims;
       const f = this.field, pls = f.pls;
+      const BG = [238, 241, 245];
       for (let i = 0; i < this.n; i++) {
-        const k = i * 3;
+        const k = i * 3, kd = this.kind[i];
         this.p.set(this.pos[k], this.pos[k + 1], this.pos[k + 2]);
+        if (kd) {
+          // 흡기: 바깥 신선 공기가 팬으로 모였다가 실내로 / 배기: 팬에서 바깥으로 뿜어져 나감
+          if (!on) { this.col[k] = BG[0] / 255; this.col[k + 1] = BG[1] / 255; this.col[k + 2] = BG[2] / 255; continue; }
+          const pl = (kd === 1 ? this.intakes : this.exhausts)[this.src[i]];
+          if (!pl) { this.spawn(i, false); continue; }
+          if (kd === 1) {
+            this.v.subVectors(this.p, pl.pos);
+            if (this.v.dot(pl.out) > 0.15) this.v.subVectors(pl.pos, this.p).normalize().multiplyScalar(f.S * 0.9);
+            else f.at(this.p, this.v, true, t);
+          } else {
+            this.v.copy(pl.out).multiplyScalar(f.S * 1.1);
+            this.v.y += f.S * 0.12; this.v.x += Math.sin(t * 3 + i) * f.S * 0.1; this.v.z += Math.cos(t * 3 + i) * f.S * 0.1;
+          }
+          this.p.addScaledVector(this.v, dt);
+          this.age[i] += dt;
+          if (this.age[i] > this.life[i]) { this.spawn(i, false); continue; }
+          this.pos[k] = this.p.x; this.pos[k + 1] = this.p.y; this.pos[k + 2] = this.p.z;
+          const fade = Math.max(0.55, Math.min(1, this.age[i] * 3, (this.life[i] - this.age[i]) * 2));
+          const c = kd === 1 ? [2, 132, 199] : (this.age[i] / this.life[i] < 0.5 ? [234, 88, 12] : [140, 120, 110]);
+          for (let q = 0; q < 3; q++) this.col[k + q] = (c[q] * fade + BG[q] * (1 - fade)) / 255;
+          continue;
+        }
         f.at(this.p, this.v, on, t);
         this.p.addScaledVector(this.v, dt);
         this.age[i] += dt;
@@ -117,7 +161,7 @@ window.FZ = window.FZ || {};
         this.pos[k] = this.p.x; this.pos[k + 1] = this.p.y; this.pos[k + 2] = this.p.z;
         const c = colorFn(this.p.x, this.p.z, this.v.length() / f.S);
         const fade = Math.min(1, this.age[i] * 2, (this.life[i] - this.age[i]) * 1.5);
-        this.col[k] = (c[0] * 0.65 + 89) / 255 * fade; this.col[k + 1] = (c[1] * 0.65 + 89) / 255 * fade; this.col[k + 2] = (c[2] * 0.65 + 89) / 255 * fade;
+        for (let q = 0; q < 3; q++) this.col[k + q] = (c[q] * 0.85 * fade + BG[q] * (1 - fade)) / 255;
       }
       this.points.geometry.attributes.position.needsUpdate = true;
       this.points.geometry.attributes.color.needsUpdate = true;
@@ -134,7 +178,7 @@ window.FZ = window.FZ || {};
       this.c = document.createElement('canvas'); this.c.width = this.nx; this.c.height = this.nz;
       this.ctx = this.c.getContext('2d'); this.img = this.ctx.createImageData(this.nx, this.nz);
       this.tex = new T.CanvasTexture(this.c); this.tex.magFilter = T.LinearFilter; this.tex.minFilter = T.LinearFilter;
-      this.mesh = new T.Mesh(new T.PlaneGeometry(L, W), new T.MeshBasicMaterial({ map: this.tex, transparent: true, opacity: 0.72, depthWrite: false }));
+      this.mesh = new T.Mesh(new T.PlaneGeometry(L, W), new T.MeshBasicMaterial({ map: this.tex, transparent: true, opacity: 0.6, depthWrite: false }));
       this.mesh.rotation.x = -Math.PI / 2; this.mesh.position.y = 0.05;
       scene.add(this.mesh);
       this.mag = new Float32Array(this.nx * this.nz); this.vals = new Float32Array(this.nx * this.nz);

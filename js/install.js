@@ -115,6 +115,7 @@ window.FZ = window.FZ || {};
       g.bracket.visible = step >= 2;
       grow(g.bracket, step === 2 ? e : 1);
       g.body.visible = step >= 3;
+      if (g.arrow) g.arrow.visible = step >= 5;
       if (step === 3) {
         const off = (1 - e) * 4;
         g.body.position.copy(g.pl.pos);

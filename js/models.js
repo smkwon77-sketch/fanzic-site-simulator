@@ -16,7 +16,7 @@ window.FZ = window.FZ || {};
     hvlsBlade: mat(0xe8ecf0, { metalness: 0.5, roughness: 0.3 }),
     yellow: mat(0xf2b632, { roughness: 0.5 }),
     concrete: mat(0x9aa2ab, { roughness: 0.9 }),
-    floor: mat(0x39424e, { roughness: 0.95 }),
+    floor: mat(0xcfd6de, { roughness: 0.95 }),
     rubber: mat(0x1a1e24, { roughness: 0.9 })
   };
   M.MAT = MAT;
@@ -237,7 +237,7 @@ window.FZ = window.FZ || {};
   function glassMat(color, op) {
     return new T.MeshStandardMaterial({ color, transparent: true, opacity: op, roughness: 0.3, metalness: 0.1, depthWrite: false, side: T.DoubleSide });
   }
-  function edges(mesh, color = 0x9ec5ff, op = 0.5) {
+  function edges(mesh, color = 0x5b7fa6, op = 0.55) {
     const e = new T.LineSegments(new T.EdgesGeometry(mesh.geometry, 20), new T.LineBasicMaterial({ color, transparent: true, opacity: op }));
     e.position.copy(mesh.position); e.rotation.copy(mesh.rotation); e.scale.copy(mesh.scale);
     return e;
@@ -248,8 +248,8 @@ window.FZ = window.FZ || {};
     const { L, W, H } = site.dims;
     const g = new T.Group();
     const rise = roofRise(site);
-    const wallM = mini ? mat(site.tint, { roughness: 0.6 }) : glassMat(0xbcd4f0, 0.1);
-    const roofM = mini ? mat(site.roof === 'arch' ? 0xd9f2ec : 0x34506e, { roughness: 0.5, transparent: site.roof === 'arch', opacity: site.roof === 'arch' ? 0.75 : 1 }) : glassMat(0xbcd4f0, 0.06);
+    const wallM = mini ? mat(site.tint, { roughness: 0.6 }) : glassMat(0xc5d5e8, 0.13);
+    const roofM = mini ? mat(site.roof === 'arch' ? 0xd9f2ec : 0x34506e, { roughness: 0.5, transparent: site.roof === 'arch', opacity: site.roof === 'arch' ? 0.75 : 1 }) : glassMat(0xc5d5e8, 0.07);
     const parts = { walls: [], roof: [] };
     const add = (m, list) => { g.add(m); if (!mini) g.add(edges(m)); if (list) list.push(m); return m; };
 
@@ -464,7 +464,7 @@ window.FZ = window.FZ || {};
       const p = FZ.PRODUCTS[it.id];
       const n = it.n, s = p.size, lane = it.lane || 0;
       if (!n) return;
-      const push = (pos, dir, flow, mount) => out.push({ id: it.id, p, kind: p.model3d, pos, dir: dir.normalize(), flow, mount });
+      const push = (pos, dir, flow, mount) => out.push({ id: it.id, p, kind: p.model3d, pos, dir: dir.normalize(), flow, mount, mode: it.mode });
       if (it.place === 'wallEnd') {
         // 첫 제품은 배기 끝 박공벽, 다음 제품은 같은 끝 쪽 측벽에 이어서
         const sp = s * 1.12;
@@ -549,6 +549,19 @@ window.FZ = window.FZ || {};
         }
       }
     });
+    // 흡기/배기: out = 바깥쪽 방향, fdir = 실제 공기 흐름 방향
+    out.forEach(pl => {
+      const m = pl.mount;
+      if (m === 'wall' || m === 'rack' || m === 'floor' && pl.flow === 'sink' || m === 'exterior') pl.out = pl.dir.clone();
+      else if (m === 'ceilingSmall' || m === 'roof') pl.out = v(0, 1, 0);
+      else if (m === 'duct') pl.out = v(1, 0, 0);
+      pl.fdir = pl.dir.clone();
+      if (!pl.out || (pl.mode !== 'intake' && pl.mode !== 'exhaust')) { pl.mode = pl.flow === 'none' ? null : (pl.mode === 'circ' ? 'circ' : pl.mode); return; }
+      if (pl.mode === 'intake') {
+        if (m === 'ceilingSmall' || m === 'duct') { pl.flow = 'down'; pl.fdir = v(0, -1, 0); }
+        else { pl.flow = 'jet'; pl.fdir = pl.out.clone().negate(); }
+      } else pl.flow = m === 'exterior' ? 'none' : 'sink';
+    });
     return out;
   };
 
@@ -616,7 +629,22 @@ window.FZ = window.FZ || {};
     cable.geometry.setDrawRange(0, 0);
     cable.userData.total = cable.geometry.index ? cable.geometry.index.count : 0;
     g.add(cable);
-    return { group: g, marker: mk, opening, bracket, body, cable, fan: f, pl };
+    // 흡기(파랑, 안쪽)·배기(주황, 바깥쪽) 화살표
+    let arrow = null;
+    if (pl.out && (pl.mode === 'intake' || pl.mode === 'exhaust')) {
+      const ex = pl.mode === 'exhaust';
+      const d = ex ? pl.out.clone() : pl.out.clone().negate();
+      const am = new T.MeshBasicMaterial({ color: ex ? 0xea580c : 0x0284c7 });
+      const L0 = Math.max(0.6, s * 1.1, Math.max(site.dims.L, site.dims.W) * 0.035);
+      arrow = new T.Group();
+      const shaft = new T.Mesh(new T.CylinderGeometry(L0 * 0.08, L0 * 0.08, L0 * 0.6, 10), am); shaft.position.y = L0 * 0.3; arrow.add(shaft);
+      const head = new T.Mesh(new T.ConeGeometry(L0 * 0.22, L0 * 0.4, 14), am); head.position.y = L0 * 0.8; arrow.add(head);
+      arrow.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d);
+      arrow.position.copy(pl.pos).addScaledVector(pl.out, ex ? s * 0.5 + 0.25 : -(s * 0.5 + 0.25 + L0));
+      if (!ex) arrow.position.addScaledVector(d, 0);
+      g.add(arrow);
+    }
+    return { group: g, marker: mk, opening, bracket, body, cable, fan: f, pl, arrow };
   };
 
   FZ.models = M;

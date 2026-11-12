@@ -87,7 +87,7 @@ window.FZ = window.FZ || {};
   }
 
   function lights(scene, span) {
-    scene.add(new T.HemisphereLight(0xdbe8ff, 0x1b2433, 0.85));
+    scene.add(new T.HemisphereLight(0xffffff, 0xb9c3cf, 0.9));
     const d = new T.DirectionalLight(0xffffff, 0.95);
     d.position.set(span * 0.6, span * 1.1, span * 0.45);
     d.castShadow = true;

@@ -1,4 +1,6 @@
-/* 설치 현장 정의 (메트릭스 10곳 + 온실·지하주차장). 치수 m, 온도 ℃, 발열 kW, UA(외피 열손실) kW/K.
+/* 용도별 기본 조건(프리셋) 12종 + 환경 조건 → 가상 현장 + 추천 점수.
+   아래 12개 정의는 용도 프리셋으로만 쓰이며, 화면에서는 사용자가 정한 면적·높이·문제에 맞춰 다시 만들어진다.
+   (원래: 설치 현장 정의 메트릭스 10곳 + 온실·지하주차장) 치수 m, 온도 ℃, 발열 kW, UA(외피 열손실) kW/K.
    pollutant.c0 = 기존(자연환기) 상태의 평균 농도 → 발생량은 c0 기준으로 역산.
    pm = 미세먼지(PM2.5) 보조 지표, 필터 제품 효과가 반영됨.
    target = 배기 제품 전체가 나눠 맡을 목표 환기량 기준, defaults = 처음 선택되는 추천 제품 */
@@ -143,26 +145,96 @@ window.FZ = window.FZ || {};
     }
   ];
 
-  /* ---------- 제품 선택 도우미 ---------- */
+  /* ---------- 용도별 기본 조건 (위 12개 정의를 용도 프리셋으로 사용) ---------- */
+  const USE_META = {
+    house:      { label: '주거', polCat: 'co2', problems: ['humid', 'co2', 'dust'], mounts: ['wall', 'ceiling', 'duct'], special: [] },
+    commercial: { label: '상업·사무', polCat: 'co2', problems: ['co2', 'odor'], mounts: ['ceiling', 'duct'], special: ['quiet'] },
+    hospital:   { label: '병원·위생', polCat: 'co2', problems: ['co2', 'dust', 'odor'], mounts: ['ceiling', 'duct'], special: ['quiet'] },
+    restaurant: { label: '주방·식당', polCat: 'odor', problems: ['odor', 'heat'], mounts: ['wall', 'ceiling', 'duct'], special: ['oily'] },
+    factory:    { label: '공장·작업장', polCat: 'dust', problems: ['heat', 'dust'], mounts: ['wall', 'roof', 'ceiling', 'floor'], special: [] },
+    logistics:  { label: '창고·물류', polCat: 'dust', problems: ['heat', 'stagnant', 'dust'], mounts: ['wall', 'roof', 'ceiling'], special: [] },
+    barn:       { label: '축사', polCat: 'gas', problems: ['heat', 'gas'], mounts: ['wall'], special: ['corrosion'] },
+    greenhouse: { label: '온실·농업', polCat: null, problems: ['heat', 'humid'], mounts: ['wall', 'ceiling', 'floor'], special: ['corrosion'] },
+    parking:    { label: '지하·주차장', polCat: 'gas', problems: ['gas', 'stagnant'], mounts: ['wall', 'ceiling', 'duct'], special: [] },
+    datacenter: { label: '서버·전기실', polCat: null, problems: ['heat'], mounts: ['wall', 'duct'], special: [] },
+    pool:       { label: '고습(수영장·욕실)', polCat: 'humid', problems: ['humid'], mounts: ['wall', 'ceiling', 'duct'], special: ['corrosion'] },
+    plant:      { label: '플랜트·중공업', polCat: 'dust', problems: ['heat', 'dust', 'gas'], mounts: ['wall', 'roof', 'floor'], special: [] }
+  };
+  // prefer: 용도별 대표 제품(영업 경험상 우선 제안) — 추천 점수 +2
+  FZ.SITES.forEach(s => { USE_META[s.id].prefer = s.defaults; });
+  FZ.USES = FZ.SITES.map(s => ({ id: s.id, ...USE_META[s.id] }));
+  const preset = id => FZ.SITES.find(s => s.id === id);
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const POL = {
+    dust: { name: '미세먼지·분진(PM10)', unit: '㎍/㎥', cOut: 40, c0: 250, limit: 100, limitLabel: '실내 관리기준 100', dec: 0, filterable: true },
+    co2: { name: '이산화탄소(CO₂)', unit: 'ppm', cOut: 420, c0: 1700, limit: 1000, limitLabel: '실내 기준 1,000', dec: 0 },
+    odor: { name: '냄새 지수', unit: '지수', cOut: 0, c0: 100, limit: 30, limitLabel: '참고 30', dec: 0, filterable: true },
+    gas: { name: '유해가스(CO 등)', unit: 'ppm', cOut: 0.5, c0: 40, limit: 25, limitLabel: '기준 25', dec: 1 }
+  };
+  const ORDER = ['gas', 'odor', 'humid', 'co2', 'dust'];
+
+  const E = FZ.env = {};
+  // 용도의 기본 조건
+  E.defaultCond = function (use) {
+    const p = preset(use), m = USE_META[use];
+    const mounts = {}; FZ.MOUNTS.forEach(x => { mounts[x.id] = m.mounts.includes(x.id); });
+    const special = {}; FZ.SPECIALS.forEach(x => { special[x.id] = m.special.includes(x.id); });
+    return { use, area: Math.round(p.dims.L * p.dims.W), H: p.dims.H, problems: [...m.problems], mounts, special };
+  };
+  // 조건 → 시뮬레이션용 가상 현장
+  E.build = function (cond) {
+    const P = preset(cond.use), m = USE_META[cond.use];
+    const s = clone(P);
+    const area = Math.max(10, cond.area), H = Math.max(2.2, cond.H);
+    const ratio = P.dims.L / P.dims.W;
+    const W = Math.sqrt(area / ratio), L = area / W;
+    const k = area / (P.dims.L * P.dims.W);
+    s.dims = { L: +L.toFixed(1), W: +W.toFixed(1), H };
+    const c = s.cond;
+    c.heat = (c.heat || 0) * k; c.UA = (c.UA || 0) * k;
+    if (c.q0 != null) c.q0 *= k;
+    if (c.workers != null) c.workers = Math.max(1, Math.round(c.workers * k));
+    if (c.animals != null) c.animals = Math.max(10, Math.round(c.animals * k));
+    const problems = cond.problems.length ? cond.problems : m.problems;
+    // 온도 모델
+    const tempNeeded = problems.includes('heat') || ['livestock', 'crop', 'it'].includes(P.mode);
+    s.tempOff = !tempNeeded;
+    if (tempNeeded && !(c.heat > 0)) { c.heat = area * 0.04; c.UA = c.UA || area * 0.006; }
+    if (!c.tIn) c.tIn = tempNeeded ? 28 : 26;
+    // 주 오염물
+    const V = L * W * H, Q0 = c.q0 != null ? c.q0 : (c.ach0 || 0) * V;
+    let cat = null;
+    if (m.polCat && problems.includes(m.polCat)) { cat = m.polCat; }
+    else {
+      cat = problems.find(x => ORDER.includes(x)) || null;
+      if (cat === 'humid') {
+        const xs = FZ.sim.xsat(c.tIn);
+        s.pollutant = { name: '실내 습도', unit: '%RH', kind: 'moisture', xOut: 10, evap: Math.max(1000, (0.88 * xs - 10) * 1.2 * Q0), limit: 65, limitLabel: '결로 방지 65', dec: 0 };
+      } else s.pollutant = cat ? { ...POL[cat] } : null;
+    }
+    // 미세먼지 보조 지표
+    s.pm = problems.includes('dust') && cat !== 'dust' ? { name: '미세먼지(PM2.5)', unit: '㎍/㎥', cOut: 35, c0: 45, limit: 35, limitLabel: '실내 권고 35', dec: 0 } : null;
+    if (P.mode === 'office' && cat !== 'co2') s.mode = 'none';
+    if (P.mode === 'worker' && !tempNeeded) s.mode = 'none';
+    s.name = m.label;
+    s.sub = `${Math.round(area).toLocaleString()}㎡ · 천장 ${H}m`;
+    s.problems = problems; s.cond_ = cond;
+    s.story = '';
+    s.products = [];
+    return s;
+  };
+
+  /* ---------- 적합도·배치 도우미 ---------- */
   const RANK = { '◎': 0, '○': 1, '△': 2 };
   const C = FZ.catalog = {};
   C.RATING_LABEL = { '◎': '최적', '○': '적합', '△': '가능' };
-
-  C.rating = function (siteId, pid) {
+  C.rating = function (useId, pid) {
     const m = FZ.MATRIX[pid];
-    if (m && m[siteId]) return { r: m[siteId], src: 'matrix' };
-    const x = FZ.EXTRA_MATRIX[siteId];
+    if (m && m[useId]) return { r: m[useId], src: 'matrix' };
+    const x = FZ.EXTRA_MATRIX[useId];
     if (x && x[pid]) return { r: x[pid], src: 'extra' };
     return null;
   };
-  // 이 현장에 적합도가 있는 제품 (◎ → ○ → △)
-  C.candidates = function (site) {
-    return Object.keys(FZ.PRODUCTS)
-      .map(id => ({ id, ...C.rating(site.id, id) }))
-      .filter(x => x.r)
-      .sort((a, b) => RANK[a.r] - RANK[b.r]);
-  };
-  // 3D 배치 방식
   C.placeFor = function (site, p) {
     switch (p.mount) {
       case 'wall': return site.kind === 'barn' || site.kind === 'greenhouse' ? 'wallEnd' : 'wallSide';
@@ -177,7 +249,6 @@ window.FZ = window.FZ || {};
       default: return 'none';
     }
   };
-  // 권장 대수 산정 기준
   C.sizingFor = function (site, id, nEx) {
     const p = FZ.PRODUCTS[id];
     if (p.role === 'exhaust') return { type: 'share', share: 1 / Math.max(1, nEx) };
@@ -195,17 +266,92 @@ window.FZ = window.FZ || {};
     if (id === 'safety_net') return { type: 'matchWall' };
     return { type: 'fixed', n: 2 };
   };
-  // 선택된 제품 id 목록 → 계산·배치용 항목
-  C.items = function (site, ids) {
+  // 선택 제품 → 계산·배치 항목 (dirs: 제품별 흡기/배기)
+  C.items = function (site, ids, dirs) {
     const nEx = ids.filter(id => FZ.PRODUCTS[id].role === 'exhaust').length;
     const lanes = {};
     return ids.map(id => {
       const p = FZ.PRODUCTS[id];
       const place = C.placeFor(site, p);
       const lane = lanes[place] = (lanes[place] ?? -1) + 1;
-      return { id, place, lane, sizing: C.sizingFor(site, id, nEx) };
+      const mode = (dirs && dirs[id]) || (FZ.TAGS[id] && FZ.TAGS[id].def) || null;
+      return { id, place, lane, mode, sizing: C.sizingFor(site, id, nEx) };
     });
   };
 
-  FZ.SITES.forEach(s => { s.products = C.items(s, s.defaults); });
+  /* ---------- 추천 점수 ---------- */
+  const R = FZ.recommend = {};
+  const MOUNT_REQ = { wall: 'wall', rack: 'wall', exterior: 'wall', duct: 'duct', ceiling: 'ceiling', hang: 'ceiling', roof: 'roof', floor: 'floor', pole: 'floor', none: null };
+  const PLABEL = id => (FZ.PROBLEMS.find(x => x.id === id) || {}).label;
+  R.mountLabel = { wall: '벽 설치', duct: '덕트 연결', ceiling: '천장 설치', roof: '지붕 설치', floor: '바닥 설치' };
+  // 조건의 목표 환기량 (대수 적정성 판단용)
+  R.needQ = function (cond) { const s = E.build(cond); return Math.max(0, FZ.sim.targetQ(s) - (s.cond.q0 != null ? 0 : (s.cond.ach0 || 0) * s.dims.L * s.dims.W * s.dims.H)); };
+  R.score = function (cond, pid, needQ) {
+    const p = FZ.PRODUCTS[pid], t = FZ.TAGS[pid];
+    const req = MOUNT_REQ[p.mount];
+    if (req && !cond.mounts[req]) return { ok: false, score: -9, reasons: [], why: `${R.mountLabel[req]} 불가` };
+    if (p.minHeight && cond.H < p.minHeight) return { ok: false, score: -9, reasons: [], why: `천장 ${p.minHeight}m 이상 필요` };
+    const rt = C.rating(cond.use, pid);
+    let s = 0; const reasons = [];
+    if (rt) { s += { '◎': 3, '○': 2, '△': 1 }[rt.r]; reasons.push(`${rt.src === 'matrix' ? '메트릭스' : '용도'} ${rt.r}`); }
+    const hit = t.solves.filter(x => cond.problems.includes(x));
+    s += hit.length * 2; hit.forEach(x => reasons.push(PLABEL(x) + ' ✓'));
+    if (cond.area >= t.area[0] && cond.area <= t.area[1]) s += 1;
+    else if (cond.area < t.area[0] * 0.5 || cond.area > t.area[1] * 2) s -= 2;
+    // 환기 제품 대수 적정성: 너무 많이 필요하면 감점, 적당하면 가점
+    if (p.role === 'exhaust' && needQ != null && p.airflow) {
+      const n = needQ / (p.airflow * (p.eff || 1));
+      if (n > 25) s -= 3; else if (n >= 0.5 && n <= 14) s += 1;
+    }
+    if ((USE_META[cond.use].prefer || []).includes(pid)) { s += 2; reasons.unshift('대표 제품'); }
+    if (cond.special.corrosion && t.corrosion) { s += 2; reasons.push('내부식'); }
+    if (cond.special.oily && t.oily) { s += 2; reasons.push('기름기 대응'); }
+    if (cond.special.quiet && t.quiet) { s += 1; reasons.push('저소음'); }
+    if (cond.special.quiet && t.loud) s -= 2;
+    if (req) reasons.push(R.mountLabel[req]);
+    return { ok: true, score: s, reasons, rating: rt };
+  };
+  // 조건에 맞는 제품 전체 (점수순)
+  R.candidates = function (cond) {
+    const nq = R.needQ(cond);
+    return Object.keys(FZ.PRODUCTS)
+      .map(id => ({ id, ...R.score(cond, id, nq) }))
+      .filter(x => x.ok && x.score > 0 && (x.rating || x.score >= 3))
+      .sort((a, b) => b.score - a.score || (a.rating ? RANK[a.rating.r] : 3) - (b.rating ? RANK[b.rating.r] : 3));
+  };
+  // 역할별로 고른 추천 세트 (2~4종)
+  R.set = function (cond) {
+    const cs = R.candidates(cond), role = id => FZ.PRODUCTS[id].role;
+    const pick = [];
+    const movers = cs.filter(x => role(x.id) === 'exhaust');
+    if (movers[0]) pick.push(movers[0]);
+    const m2 = movers.find(x => x !== movers[0] && FZ.PRODUCTS[x.id].mount !== FZ.PRODUCTS[movers[0].id].mount && x.score >= movers[0].score - 2);
+    if (m2 && cond.area >= 600) pick.push(m2);
+    if (cond.problems.includes('heat') || cond.problems.includes('stagnant')) {
+      const circ = cs.filter(x => ['hvls', 'circulate', 'spot'].includes(role(x.id)) && x.score >= 4);
+      const hv = circ.find(x => role(x.id) === 'hvls');
+      const cir = (cond.area >= 600 && hv && circ[0] && hv.score >= circ[0].score - 1) ? hv : circ[0];
+      if (cir) pick.push(cir);
+    }
+    if (cond.problems.includes('dust') || cond.problems.includes('odor')) {
+      const f = cs.find(x => role(x.id) === 'filter' && x.score >= 3);
+      if (f) pick.push(f);
+    }
+    if (pick.length < 4) {
+      const has = m => pick.some(x => FZ.PRODUCTS[x.id].mount === m && role(x.id) === 'exhaust');
+      const acc = cs.find(x => role(x.id) === 'accessory' && x.score >= 4 && !pick.includes(x) &&
+        (x.id === 'safety_net' ? has('wall') : x.id === 'hoodcap' ? (has('duct') || has('ceiling')) : true));
+      if (acc) pick.push(acc);
+    }
+    if (!pick.length) cs.slice(0, 2).forEach(x => pick.push(x));
+    return pick.slice(0, 4);
+  };
+  // 제품 → 용도별 적합 순위 (영업 학습용)
+  R.forProduct = function (pid) {
+    return FZ.USES.map(u => {
+      const cond = E.defaultCond(u.id);
+      FZ.MOUNTS.forEach(m => { cond.mounts[m.id] = true; });
+      return { use: u, cond, ...R.score(cond, pid, R.needQ(cond)) };
+    }).sort((a, b) => b.score - a.score);
+  };
 })();
