@@ -134,6 +134,29 @@ p { margin: 0; }
 .chip { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
 .chip.rep { color: var(--warn); border-color: rgba(251, 191, 36, 0.4); }
 .linkbtn { background: none; border: 0; color: var(--accent); font-size: 12px; padding: 0; }
+.linkbtn.rm { align-self: flex-start; color: var(--muted); }
+.linkbtn.rm:hover { color: var(--bad); }
+/* 추천 제품 선택 */
+.selsum { display: flex; justify-content: space-between; align-items: center; background: var(--panel-2); border-radius: 8px; padding: 8px 12px; font-size: 13px; }
+.selsum .num { color: var(--accent); }
+.filt { display: flex; flex-wrap: wrap; gap: 4px; }
+.fchip { background: var(--bg); border: 1px solid var(--line); color: var(--muted); border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600; }
+.fchip[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: #fff; }
+.rgroup { display: flex; flex-direction: column; gap: 6px; }
+.rhead { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 4px; }
+.rate { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; font-size: 14px; font-weight: 700; flex: none; }
+.rate.r0 { background: rgba(74, 222, 128, 0.16); color: var(--good); }
+.rate.r1 { background: rgba(56, 189, 248, 0.16); color: var(--accent); }
+.rate.r2 { background: rgba(142, 164, 191, 0.16); color: var(--muted); }
+.pick { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; text-align: left; background: var(--panel-2); border: 1px dashed var(--line); border-radius: 10px; padding: 9px 12px; }
+.pick:hover { border-color: var(--accent); border-style: solid; }
+.pick .pn { display: flex; flex-direction: column; min-width: 0; }
+.pick .pn b { font-size: 13px; }
+.pick .model { font-family: var(--f-mono); font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pick .add { font-size: 12px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+.prod.on { border-color: var(--accent); }
+.prod .pt { display: flex; gap: 8px; align-items: flex-start; min-width: 0; }
+.feat { margin: 0; padding-left: 16px; font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
 
 /* 단계 목록 */
 .steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -258,6 +281,7 @@ details.assume .fields { margin-top: 10px; grid-template-columns: repeat(2, minm
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="data/logo.js"></script>
 <script src="data/products.js"></script>
+<script src="data/matrix.js"></script>
 <script src="data/sites.js"></script>
 <script src="js/sim.js"></script>
 <script src="js/models.js"></script>

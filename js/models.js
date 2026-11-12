@@ -131,10 +131,11 @@ window.FZ = window.FZ || {};
       g.add(rotor);
       const mot = cyl(r * 0.3, r * 0.3, len * 0.45, MAT.dark); mot.rotation.x = Math.PI / 2; mot.position.z = -len * 0.22; g.add(mot);
       const box1 = box(0.12, 0.1, 0.16, MAT.dark); box1.position.set(0, r + 0.05, 0); g.add(box1);
-    } else if (kind === 'centrifugal') {
+    } else if (kind === 'centrifugal' || kind === 'centrifugalSus') {
       const r = s * 0.5, w = s * 0.45;
-      const scroll = cyl(r, r, w, MAT.navy, 32); scroll.rotation.x = Math.PI / 2; g.add(scroll);
-      const outlet = box(r * 0.9, r * 1.1, w, MAT.navy); outlet.position.set(r * 0.55, r * 0.55, 0); g.add(outlet);
+      const sm = kind === 'centrifugalSus' ? MAT.metal : MAT.navy;
+      const scroll = cyl(r, r, w, sm, 32); scroll.rotation.x = Math.PI / 2; g.add(scroll);
+      const outlet = box(r * 0.9, r * 1.1, w, sm); outlet.position.set(r * 0.55, r * 0.55, 0); g.add(outlet);
       const bell = ringZ(r * 0.45, 0.04, MAT.metal); bell.position.z = w / 2 + 0.01; g.add(bell);
       rotor = new T.Group();
       for (let i = 0; i < 10; i++) { const fin = box(0.02, r * 0.3, w * 0.6, MAT.blade); const a = i / 10 * Math.PI * 2; fin.position.set(Math.cos(a) * r * 0.32, Math.sin(a) * r * 0.32, 0); fin.rotation.z = a + 0.5; rotor.add(fin); }
@@ -201,6 +202,29 @@ window.FZ = window.FZ || {};
       rotor = rr;
       const pole = cyl(0.12, 0.16, 7, MAT.steel); pole.position.y = 3.5; g.add(pole);
       const ft = box(1, 0.3, 1, MAT.concrete); ft.position.y = 0.15; g.add(ft);
+    } else if (kind === 'ceilvent') {
+      // 천장형 환풍기: 사각 그릴 패널
+      axis = 'y';
+      const plate = box(s, 0.04, s, mat(0xf3f5f7));
+      g.add(plate);
+      for (let i = 0; i < 5; i++) { const sl = box(s * 0.8, 0.02, 0.02, MAT.steel); sl.position.set(0, -0.03, -s * 0.32 + i * s * 0.16); g.add(sl); }
+      const housing = box(s * 0.8, s * 0.6, s * 0.8, MAT.steel); housing.position.y = s * 0.32; g.add(housing);
+      rotor = new T.Group();
+      for (let i = 0; i < 6; i++) { const b = box(s * 0.3, 0.01, s * 0.08, MAT.bladeDark); b.position.x = s * 0.15; const arm = new T.Group(); arm.add(b); arm.rotation.y = i / 6 * Math.PI * 2; rotor.add(arm); }
+      rotor.position.y = s * 0.12; g.add(rotor);
+    } else if (kind === 'filterbox') {
+      // 팬도라: 3중 필터 박스 (앞면 그릴)
+      const bx = box(s, s * 0.7, s * 0.9, mat(0xe9edf2)); g.add(bx);
+      const face = box(s * 0.86, s * 0.56, 0.02, MAT.dark); face.position.z = s * 0.46; g.add(face);
+      for (let i = 0; i < 6; i++) { const sl = box(s * 0.84, 0.015, 0.03, MAT.steel); sl.position.set(0, -s * 0.24 + i * s * 0.095, s * 0.47); g.add(sl); }
+      const lab = box(s * 0.3, s * 0.08, 0.01, MAT.red); lab.position.set(0, s * 0.3, s * 0.46); g.add(lab);
+      rotor = null;
+    } else if (kind === 'hoodcap') {
+      // 후드캡: 외벽 배기구 마감
+      const hood = new T.Mesh(new T.CylinderGeometry(s * 0.5, s * 0.5, s * 0.6, 20, 1, false, 0, Math.PI), MAT.metal);
+      hood.rotation.x = Math.PI / 2; hood.position.z = s * 0.3; g.add(hood);
+      const pipe = cyl(s * 0.3, s * 0.3, s * 0.4, MAT.metal, 16); pipe.rotation.x = Math.PI / 2; g.add(pipe);
+      rotor = null;
     }
     g.traverse(o => { if (o.isMesh) { o.castShadow = true; } });
     return { group: g, rotor, axis };
@@ -376,6 +400,28 @@ window.FZ = window.FZ || {};
       g.add(inst(new T.BoxGeometry(0.9, 2.2, 1.0), mat(0x161b22, { metalness: 0.4 }), rk));
       g.add(inst(new T.BoxGeometry(0.5, 0.04, 0.02), glowM(0x22d3ee), led));
       [-0.22, 0.22].forEach(z => { const c = box(L * 0.62, 0.05, W * 0.12, mat(0xff8a5c, { transparent: true, opacity: 0.25 })); c.position.set(-L * 0.32 + 8.5, 2.3, z * W); g.add(c); });
+    } else if (k === 'house') {
+      const fl = box(L * 0.98, 0.04, W * 0.98, mat(0xc9a47a)); fl.position.y = 0.02; g.add(fl);
+      const wallM = mat(0xf2ede4, { transparent: true, opacity: 0.55 });
+      const part1 = box(0.1, H * 0.95, W * 0.45, wallM); part1.position.set(L * 0.2, H * 0.47, -W * 0.27); g.add(part1);
+      const part2 = box(L * 0.3, H * 0.95, 0.1, wallM); part2.position.set(L * 0.35, H * 0.47, -W * 0.05); g.add(part2);
+      const sofa = box(2.4, 0.8, 0.9, mat(0x3d5a80)); sofa.position.set(-L * 0.25, 0.4, W * 0.32); g.add(sofa);
+      const tbl = box(1.2, 0.45, 0.7, mat(0x8a6a4a)); tbl.position.set(-L * 0.25, 0.23, W * 0.12); g.add(tbl);
+      const tv = box(1.8, 1.0, 0.08, MAT.dark); tv.position.set(-L * 0.25, 1.2, -W * 0.45); g.add(tv);
+      const cnt = box(3.2, 0.9, 0.7, mat(0xefefef)); cnt.position.set(-L * 0.05, 0.45, -W * 0.4); g.add(cnt);
+      const stove = cyl(0.2, 0.2, 0.05, glowM(0xff5a1f), 12); stove.position.set(-L * 0.05, 0.93, -W * 0.4); g.add(stove);
+      const tub = box(1.6, 0.55, 0.8, mat(0xffffff)); tub.position.set(L * 0.37, 0.28, -W * 0.38); g.add(tub);
+      const bed = box(1.6, 0.5, 2.1, mat(0xdfe6ee)); bed.position.set(L * 0.36, 0.25, W * 0.25); g.add(bed);
+      for (let i = 0; i < 3; i++) { const pp = person(0x6b8e5a); pp.scale.setScalar(0.85); pp.children[2].visible = false; pp.position.set(-L * 0.3 + i * 1.4, 0, W * 0.05 + (i % 2) * 0.8); g.add(pp); }
+    } else if (k === 'hospital') {
+      const beds = [], pil = [], curt = [];
+      for (let r = 0; r < 2; r++) for (let i = 0; i < 8; i++) { const x = -L * 0.4 + i * L * 0.105, z = (r ? 1 : -1) * W * 0.3; beds.push([x, 0.35, z]); pil.push([x, 0.62, z + (r ? 0.75 : -0.75)]); }
+      for (let r = 0; r < 2; r++) for (let i = 0; i < 9; i++) curt.push([-L * 0.45 + i * L * 0.105, 1.1, (r ? 1 : -1) * W * 0.3]);
+      g.add(inst(new T.BoxGeometry(1.0, 0.5, 2.0), mat(0xf4f7fa), beds));
+      g.add(inst(new T.BoxGeometry(0.8, 0.12, 0.35), mat(0x9fc5e8), pil));
+      g.add(inst(new T.BoxGeometry(0.04, 2.2, 2.2), mat(0xa8d5c9, { transparent: true, opacity: 0.45 }), curt));
+      const desk = box(3, 1.0, 0.8, mat(0xe0e6ec)); desk.position.set(L * 0.38, 0.5, 0); g.add(desk);
+      for (let i = 0; i < 8; i++) { const pp = person(i < 3 ? 0x7fb8e6 : 0xd7dde3); pp.scale.setScalar(0.85); pp.children[2].visible = false; pp.position.set(rnd(-L * 0.4, L * 0.4), 0, rnd(-W * 0.12, W * 0.12)); g.add(pp); }
     } else if (k === 'office') {
       const desks = [], mon = [];
       for (let r = 0; r < 5; r++) for (let i = 0; i < 10; i++) { desks.push([-L * 0.4 + i * L * 0.09, 0.38, -W * 0.36 + r * W * 0.18]); mon.push([-L * 0.4 + i * L * 0.09, 0.98, -W * 0.36 + r * W * 0.18 - 0.25]); }
@@ -413,28 +459,35 @@ window.FZ = window.FZ || {};
     const rise = roofRise(site);
     const out = [];
     const v = (x, y, z) => new T.Vector3(x, y, z);
+    const used = {}; // 같은 배치 방식을 쓰는 제품끼리 이어서 배치
     items.forEach(it => {
       const p = FZ.PRODUCTS[it.id];
-      const n = it.n, s = p.size;
+      const n = it.n, s = p.size, lane = it.lane || 0;
+      if (!n) return;
       const push = (pos, dir, flow, mount) => out.push({ id: it.id, p, kind: p.model3d, pos, dir: dir.normalize(), flow, mount });
       if (it.place === 'wallEnd') {
+        // 첫 제품은 배기 끝 박공벽, 다음 제품은 같은 끝 쪽 측벽에 이어서
         const sp = s * 1.12;
         const cols = Math.max(1, Math.floor((W - 0.6) / sp));
         const rows = Math.max(1, Math.floor((H - 0.3) / sp));
         let k = 0;
-        for (let r = 0; r < rows && k < n; r++) {
-          const inRow = Math.min(cols, n - k);
-          for (let c = 0; c < inRow; c++, k++) push(v(L / 2, 0.25 + s / 2 + r * sp, (c - (inRow - 1) / 2) * sp), v(1, 0, 0), 'sink', 'wall');
+        if (lane === 0) {
+          for (let r = 0; r < rows && k < n; r++) {
+            const inRow = Math.min(cols, n - k);
+            for (let c = 0; c < inRow; c++, k++) push(v(L / 2, 0.25 + s / 2 + r * sp, (c - (inRow - 1) / 2) * sp), v(1, 0, 0), 'sink', 'wall');
+          }
         }
-        let j = 0;
-        while (k < n) { const sd = j % 2 ? -1 : 1; push(v(L / 2 - 2 - Math.floor(j / 2) * sp, H / 2, sd * W / 2), v(0, 0, sd), 'sink', 'wall'); k++; j++; }
+        let j = used.sideEnd || 0;
+        while (k < n) { const sd = j % 2 ? -1 : 1; push(v(L / 2 - 2 - Math.floor(j / 2) * Math.max(sp, 1.6), Math.min(H - s / 2 - 0.2, H / 2), sd * W / 2), v(0, 0, sd), 'sink', 'wall'); k++; j++; }
+        used.sideEnd = j;
       } else if (it.place === 'wallSide') {
         const per = Math.ceil(n / 2);
         for (let i = 0; i < n; i++) {
           const sd = i % 2 ? -1 : 1, idx = Math.floor(i / 2);
           const cnt = sd > 0 ? per : n - per;
-          const x = -L / 2 + (idx + 0.5) * L / Math.max(1, cnt);
-          push(v(x, H * 0.55, sd * W / 2), v(0, 0, sd), 'sink', 'wall');
+          const x = -L / 2 + (idx + 0.5 + lane * 0.4) * L / Math.max(1, cnt);
+          const y = Math.max(s / 2 + 0.3, Math.min(H - s / 2 - 0.2, H * (0.55 - 0.2 * lane)));
+          push(v(Math.min(L / 2 - s, x), y, sd * W / 2), v(0, 0, sd), 'sink', 'wall');
         }
       } else if (it.place === 'roofLine') {
         for (let i = 0; i < n; i++) {
@@ -452,14 +505,16 @@ window.FZ = window.FZ || {};
         for (let r = 0; r < rows; r++) {
           const inRow = Math.min(cols, n - k);
           for (let c = 0; c < inRow; c++, k++) {
-            const x = -L / 2 + (c + 0.5) * L / inRow, z = -W / 2 + (r + 0.5) * W / rows;
+            const off = it.place === 'ceilingGrid' ? 0 : lane * 0.33;
+            const x = -L / 2 + (c + 0.5 + off) * L / inRow, z = -W / 2 + (r + 0.5 + off) * W / rows;
             if (it.place === 'ceilingGrid') push(v(x, H - 2.2, z), v(0, -1, 0), 'down', 'ceiling');
             else if (it.place === 'ceilingSmall') push(v(x, H - 0.05, z), v(0, -1, 0), 'down', 'ceilingSmall');
-            else push(v(x, site.kind === 'greenhouse' ? H * 0.62 : H - 0.7, z), v(1, 0, 0), 'jet', 'hang');
+            else push(v(x, (site.kind === 'greenhouse' ? H * 0.62 : H - 0.7) - lane * 0.7, z), v(1, 0, 0), 'jet', 'hang');
           }
         }
       } else if (it.place === 'ductLine') {
-        const z = site.kind === 'kitchen' ? -W * 0.3 : -W * 0.15;
+        const z0 = site.kind === 'kitchen' ? -W * 0.3 : -W * 0.15;
+        const z = Math.max(-W / 2 + 0.8, Math.min(W / 2 - 0.8, z0 + (lane % 2 ? 1 : -1) * Math.ceil(lane / 2) * Math.max(1.4, W * 0.12)));
         for (let i = 0; i < n; i++) {
           const x = -L / 2 + (i + 0.5) * L / n;
           push(v(x, H - Math.max(0.6, s * 0.8), z), v(1, 0, 0), 'sink', 'duct');
@@ -474,12 +529,19 @@ window.FZ = window.FZ || {};
         }
       } else if (it.place === 'outdoorPoles') {
         for (let i = 0; i < n; i++) push(v(-L / 3 + i * (2 * L / 3) / Math.max(1, n - 1), 0, W / 2 + 7), v(0, -0.3, -1), 'none', 'pole');
+      } else if (it.place === 'floorWall') {
+        // 바닥 설치형 송풍기: 뒤쪽 벽을 따라
+        const z = -W / 2 + Math.max(1.2, s) + lane * Math.max(1.8, s * 1.6);
+        for (let i = 0; i < n; i++) push(v(-L / 2 + (i + 0.5) * L / n, s * 0.55 + 0.05, Math.min(W / 2 - 1, z)), v(0, 0, -1), 'sink', 'floor');
+      } else if (it.place === 'exterior') {
+        for (let i = 0; i < n; i++) push(v(L / 2 + 0.2, H * 0.7, (i - (n - 1) / 2) * Math.min(1.6, (W - 1) / Math.max(1, n))), v(1, 0, 0), 'none', 'exterior');
       } else if (it.place === 'floorSpots') {
-        const hs = (site.heatSources || []).map(([x, z]) => ({ x: x * L, z: z * W }));
+        let hs = (site.heatSources || []).map(([x, z]) => ({ x: x * L, z: z * W }));
+        if (!hs.length) hs = [{ x: 0, z: 0 }];
         for (let i = 0; i < n; i++) {
           const h = hs[i % hs.length];
-          const a = (i / n) * Math.PI * 2 + 0.3;
-          const R = 11;
+          const a = (i / n) * Math.PI * 2 + 0.3 + lane * 0.5;
+          const R = Math.min(11, Math.min(L, W) * 0.35) + lane * 2;
           const pos = v(h.x + Math.cos(a) * R, 1.05, h.z + Math.sin(a) * R * 0.75);
           pos.z = Math.max(-W / 2 + 2, Math.min(W / 2 - 2, pos.z));
           const dir = v(h.x - pos.x, 0, h.z - pos.z);

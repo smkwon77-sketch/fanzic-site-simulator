@@ -7,7 +7,7 @@
   const clone = o => JSON.parse(JSON.stringify(o));
 
   const st = {
-    view: 'map', site: null, qty: {}, prm: { ...FZ.DEFAULTS },
+    view: 'map', site: null, qty: {}, sel: [], filter: '전체', prm: { ...FZ.DEFAULTS },
     tab: 'install', step: 0, stepK: 0, stepPlay: true,
     t: 0, simPlay: false, heat: 'temp', metric: 'temp', hover: null, spin: 0
   };
@@ -20,6 +20,8 @@
   function sizingText(site, it) {
     const s = it.sizing, p = P[it.id];
     switch (s.type) {
+      case 'share': return `${FZ.sim.targetText(site)} 기준` + (s.share < 1 ? ` · 배기 ${Math.round(s.share * 100)}% 분담` : '');
+      case 'matchWall': return '벽부 고압팬 대수만큼';
       case 'ach': return `환기횟수 ${s.target}회/h 기준`;
       case 'velocity': return `터널 풍속 ${s.target}m/s 기준`;
       case 'cover': return `대당 약 ${fmt(p.cover)}㎡ 커버`;
@@ -27,12 +29,12 @@
       case 'flowPerArea': return `바닥 1㎡당 ${s.value}㎥/h 기준`;
       case 'perPerson': return `1인당 ${s.value}㎥/h 기준`;
       case 'perWorkers': return `작업자 ${s.value}명당 1대`;
-      case 'heat': return `IT 발열 ${site.cond.heat}kW · 급배기 온도차 ${s.dT}℃ 기준`;
+      case 'fixed': return `기본 ${s.n}대`;
       default: return '기본 구성';
     }
   }
   function mountOf(it) {
-    return { wallEnd: 'wall', wallSide: 'wall', roofLine: 'roof', ceilingGrid: 'ceiling', hangGrid: 'hang', ceilingSmall: 'ceilingSmall', ductLine: 'duct', rack: 'rack', outdoorPoles: 'pole', floorSpots: 'floor' }[it.place];
+    return { wallEnd: 'wall', wallSide: 'wall', roofLine: 'roof', ceilingGrid: 'ceiling', hangGrid: 'hang', ceilingSmall: 'ceilingSmall', ductLine: 'duct', rack: 'rack', outdoorPoles: 'pole', floorSpots: 'floor', floorWall: 'floor', exterior: 'exterior', none: 'none' }[it.place];
   }
   function status(v, limit, lowerIsBetter = true) {
     if (limit == null) return null;
@@ -46,7 +48,8 @@
     const rows = [];
     rows.push({ k: '환기 횟수', u: '회/h', a: r.ach0, b: r.ach, d: 1 });
     rows.push({ k: '총 환기량', u: '㎥/h', a: r.Q0, b: r.Q, d: 0 });
-    if (r.pol) rows.push({ k: r.pol.name, u: r.pol.unit, a: r.pol.c0, b: r.pol.c1, d: r.pol.dec, lim: r.pol.limit });
+    if (r.pol) rows.push({ k: r.pol.name + (r.pol.filtered ? ' (필터 포함)' : ''), u: r.pol.unit, a: r.pol.c0, b: r.pol.c1, d: r.pol.dec, lim: r.pol.limit });
+    if (r.pm) rows.push({ k: r.pm.name + (r.pm.filtered ? ' (필터 포함)' : ''), u: r.pm.unit, a: r.pm.c0, b: r.pm.c1, d: 0, lim: r.pm.limit });
     if (r.tempOn) {
       rows.push({ k: '실내 온도', u: '℃', a: r.T0, b: r.T1, d: 1 });
       rows.push({ k: r.animal ? '체감 온도(가축)' : '체감 온도', u: '℃', a: r.Teff0, b: r.steady.Teff, d: 1 });
@@ -84,8 +87,8 @@
 
   /* ---------- 지도 ---------- */
   function mapCam(dur) {
-    const o = E.orbit; o.minR = 40; o.maxR = 220; o.minPhi = 0.25; o.maxPhi = 1.3;
-    o.set({ target: new T.Vector3(0, 0, 2), radius: innerWidth < 760 ? 150 : 112, theta: 0.5, phi: 0.92 }, dur);
+    const o = E.orbit; o.minR = 40; o.maxR = 260; o.minPhi = 0.25; o.maxPhi = 1.3;
+    o.set({ target: new T.Vector3(0, 0, 2), radius: innerWidth < 760 ? 210 : 150, theta: 0.5, phi: 0.92 }, dur);
     o.auto = 0.025;
   }
   function showMap(first) {
@@ -137,12 +140,12 @@
       <div>
         <div class="eyebrow">설치 현장 ${FZ.SITES.length}곳</div>
         <h2>어디에 설치하시나요?</h2>
-        <p class="muted small" style="margin-top:6px">현장을 고르면 권장 제품과 대수가 자동으로 잡히고, 설치 과정과 도입 효과를 3D로 보여줍니다.</p>
+        <p class="muted small" style="margin-top:6px">현장을 고르면 「제품별 용도 메트릭스」 기준 추천 제품이 나옵니다. 제품을 골라 넣으면 권장 대수가 잡히고, 설치 과정과 도입 효과를 3D로 보여줍니다.</p>
       </div>
       <div class="sites">${rows.map(({ s, r }) => `
         <button type="button" class="site-btn" data-id="${s.id}">
           <b>${esc(s.name)}</b><span class="kpi">${fmt(r.ach0, 1)}→${fmt(r.ach, 1)}회/h</span>
-          <span class="sub">${esc(s.sub)} · ${s.products.map(it => esc(P[it.id].family)).filter((v, i, a) => a.indexOf(v) === i).join(' · ')}</span>
+          <span class="sub">${esc(s.sub)} · 추천 ${FZ.catalog.candidates(s).length}종${s.matrixOut ? ' · 메트릭스 외' : ''}</span>
         </button>`).join('')}
       </div>`;
     $('left').querySelectorAll('.site-btn').forEach(b => {
@@ -152,7 +155,7 @@
     });
     $('right').innerHTML = `
       <div>
-        <div class="eyebrow">권장 구성 기준 예상 효과</div>
+        <div class="eyebrow">기본 추천 구성 기준 예상 효과</div>
         <h2>현장별 한눈에 보기</h2>
       </div>
       <div style="overflow-x:auto">
@@ -166,7 +169,7 @@
           </tr>`).join('')}
         </tbody>
       </table></div>
-      <p class="note">연간 효과는 전기요금 절감과 생산성·축산 개선을 금액으로 환산한 값입니다. 모든 수치는 현장 크기·발열 등 대표 조건을 넣은 단순 모델의 참고 추정치이며, 현장 조건을 바꾸면 다시 계산됩니다. 제품 사양은 카탈로그 최대 성능(60Hz) 기준입니다.</p>`;
+      <p class="note">연간 효과는 전기요금 절감과 생산성·축산 개선을 금액으로 환산한 값입니다. 모든 수치는 현장 크기·발열 등 대표 조건을 넣은 단순 모델의 참고 추정치이며, 현장 조건을 바꾸면 다시 계산됩니다. 제품 사양은 카탈로그 대표 모델(50Hz, 일부 60Hz 표기) 기준입니다.</p>`;
     $('right').querySelectorAll('tr[data-id]').forEach(tr => tr.addEventListener('click', () => enterSite(tr.dataset.id)));
   }
   function shortName(n) { return n.replace(/\(.*?\)/g, '').trim(); }
@@ -183,6 +186,7 @@
       disposeSite();
       st.view = 'site';
       st.site = clone(base);
+      st.sel = [...base.defaults]; st.filter = '전체';
       st.qty = recQty(st.site);
       st.tab = 'install'; st.step = 0; st.stepK = 0; st.stepPlay = true; st.t = 0; st.simPlay = false; st.spin = 0;
       st.heat = st.site.tempOff ? 'pol' : 'temp';
@@ -260,6 +264,7 @@
 
   function renderLeft() {
     const s = st.site, c = s.cond, d = s.dims;
+    const keepScroll = $('left').scrollTop;
     const people = s.mode === 'livestock' ? ['animals', '사육 수(수)'] : (c.workers != null ? ['workers', s.mode === 'office' ? '재실 인원(명)' : '작업자(명)'] : null);
     $('left').innerHTML = `
       <div>
@@ -276,9 +281,10 @@
           ${people ? fld('cPeople', people[1], c[people[0]]) : ''}
         </div>
       </div>
-      <div class="row"><h3>설치 제품</h3><button type="button" class="linkbtn" id="resetQty">권장 대수로 맞추기</button></div>
-      ${s.products.map(it => prodCard(s, it)).join('')}
+      <div class="row"><h3>추천 제품 선택</h3><button type="button" class="linkbtn" id="resetQty">권장 대수로 맞추기</button></div>
+      ${pickerHtml(s)}
     `;
+    $('left').scrollTop = keepScroll;
     const num = id => { const v = parseFloat($(id).value); return isFinite(v) ? v : null; };
     const bind = (id, fn, rebuild) => { const el = $(id); if (!el) return; el.addEventListener('change', () => { const v = num(id); if (v == null || v < 0) { renderLeft(); return; } fn(v); onSiteChange(rebuild); }); };
     bind('dimL', v => { s.dims.L = Math.max(8, Math.min(300, v)); }, true);
@@ -288,6 +294,9 @@
     bind('cHeat', v => { c.heat = v; });
     if (people) bind('cPeople', v => { c[people[0]] = Math.round(v); });
     $('resetQty').addEventListener('click', () => { st.qty = recQty(s); rebuildFans(); renderLeft(); renderRight(); });
+    $('left').querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', () => setSel([...st.sel, b.dataset.add])));
+    $('left').querySelectorAll('[data-remove]').forEach(b => b.addEventListener('click', () => setSel(st.sel.filter(x => x !== b.dataset.remove))));
+    $('left').querySelectorAll('[data-f]').forEach(b => b.addEventListener('click', () => { st.filter = b.dataset.f; renderLeft(); }));
     $('left').querySelectorAll('[data-q]').forEach(b => b.addEventListener('click', () => {
       const id = b.dataset.id, dv = +b.dataset.q;
       st.qty[id] = Math.max(1, Math.min(40, st.qty[id] + dv));
@@ -295,11 +304,47 @@
     }));
   }
   function fld(id, label, v) { return `<div class="field"><label for="${id}">${label}</label><input id="${id}" type="number" inputmode="decimal" value="${v}"></div>`; }
-  function prodCard(s, it) {
+  const RCLS = { '◎': 'r0', '○': 'r1', '△': 'r2' };
+  function rateBadge(c) { return `<span class="rate ${RCLS[c.r]}" title="${FZ.catalog.RATING_LABEL[c.r]}">${c.r}</span>`; }
+  function pickerHtml(s) {
+    const cands = FZ.catalog.candidates(s);
+    const groups = ['전체', ...new Set(cands.map(c => P[c.id].group))];
+    if (!groups.includes(st.filter)) st.filter = '전체';
+    const list = cands.filter(c => st.filter === '전체' || P[c.id].group === st.filter);
+    const units = st.sel.reduce((a, id) => a + (st.qty[id] || 0), 0);
+    return `<p class="note">${s.matrixOut ? '이 현장은 「제품별 용도 메트릭스」에 없어 브로셔 용도 기준으로 추천했습니다.' : '「제품별 용도 메트릭스」 기준 적합도입니다. "메트릭스 외"는 브로셔 용도 기준 추천입니다.'} 제품을 넣고 빼면 권장 대수·3D 배치·효과가 바로 다시 계산됩니다.</p>
+      <div class="selsum"><b>${st.sel.length}종 선택</b><span class="num">총 ${units}대</span></div>
+      <div class="filt" role="group" aria-label="제품군">${groups.map(g => `<button type="button" class="fchip" data-f="${esc(g)}" aria-pressed="${g === st.filter}">${esc(g)}</button>`).join('')}</div>
+      ${['◎', '○', '△'].map(r => {
+        const xs = list.filter(c => c.r === r);
+        if (!xs.length) return '';
+        return `<div class="rgroup"><div class="rhead">${rateBadge({ r })}<b>${FZ.catalog.RATING_LABEL[r]}</b><span class="muted small">${xs.length}종</span></div>
+          ${xs.map(c => st.sel.includes(c.id) ? prodCard(s, c) : pickRow(c)).join('')}</div>`;
+      }).join('')}`;
+  }
+  function pickRow(c) {
+    const p = P[c.id];
+    return `<button type="button" class="pick" data-add="${c.id}" aria-label="${esc(p.name)} 추가">
+      ${rateBadge(c)}
+      <span class="pn"><b>${esc(p.name)}</b><span class="model">${esc(p.model)}${c.src === 'extra' ? ' · 메트릭스 외' : ''}</span></span>
+      <span class="add">+ 추가</span>
+    </button>`;
+  }
+  function setSel(ids) {
+    st.sel = ids;
+    st.site.products = FZ.catalog.items(st.site, ids);
+    st.qty = recQty(st.site);
+    if (st.tab === 'install') { st.step = 0; st.stepK = 0; st.stepPlay = true; }
+    rebuildFans(); renderLeft(); renderRight(); renderHud();
+  }
+  function prodCard(s, c) {
+    const it = s.products.find(x => x.id === c.id);
     const p = P[it.id], n = st.qty[it.id], rec = FZ.sim.recommend(s, it);
-    return `<div class="prod">
+    const lowCeil = p.minHeight && s.dims.H < p.minHeight;
+    const noEffect = p.role === 'accessory' || p.role === 'none' || (p.role === 'filter' && !(s.pm || (s.pollutant && s.pollutant.filterable)));
+    return `<div class="prod on">
       <div class="head">
-        <div><b>${esc(p.name)}</b><div class="model">${esc(p.model)}</div></div>
+        <div class="pt">${rateBadge(c)}<div><b>${esc(p.name)}</b><div class="model">${esc(p.model)}</div></div></div>
         <div class="stepper" role="group" aria-label="${esc(p.name)} 수량">
           <button type="button" data-q="-1" data-id="${it.id}" aria-label="한 대 줄이기">−</button>
           <output class="num">${n}</output>
@@ -307,17 +352,21 @@
         </div>
       </div>
       <div class="specs">
-        <div><span>대당 풍량</span><em>${p.airflow ? fmt(p.airflow) : '–'}</em></div>
-        <div><span>소비전력</span><em>${fmt(p.power / 1000, 2)}kW</em></div>
-        <div><span>정압</span><em>${p.pressure ? p.pressure + 'mmAq' : '–'}</em></div>
+        <div><span>대당 풍량(㎥/h)</span><em>${p.airflow ? fmt(p.airflow) : '–'}</em></div>
+        <div><span>소비전력</span><em>${p.power ? fmt(p.power / 1000, 2) + 'kW' : '–'}</em></div>
+        <div><span>정압</span><em>${esc(p.pressure || '–')}</em></div>
       </div>
-      <p class="small muted">${esc(p.note)}</p>
+      <ul class="feat">${p.features.map(f => `<li>${esc(f)}</li>`).join('')}</ul>
       <div class="chips">
         <span class="chip">${I.MOUNT_LABEL[mountOf(it)]}</span>
         <span class="chip">권장 ${rec}대 · ${esc(sizingText(s, it))}</span>
-        ${p.acc.map(a => `<span class="chip">${esc(a)}</span>`).join('')}
-        ${p.rep ? '<span class="chip rep">대표값</span>' : ''}
+        ${c.src === 'extra' ? '<span class="chip">메트릭스 외</span>' : ''}
+        ${p.hz === 60 ? '<span class="chip">60Hz 사양</span>' : ''}
+        ${p.rep ? '<span class="chip rep">가정값 포함</span>' : ''}
+        ${lowCeil ? `<span class="chip rep">천장 ${p.minHeight}m 이상 필요</span>` : ''}
+        ${noEffect ? '<span class="chip">효과 계산 제외</span>' : ''}
       </div>
+      <button type="button" class="linkbtn rm" data-remove="${it.id}">이 제품 빼기</button>
     </div>`;
   }
   function onSiteChange(rebuild) {
@@ -338,7 +387,7 @@
   }
 
   function renderInstall() {
-    const mounts = [...new Set(st.site.products.map(mountOf))];
+    const mounts = [...new Set(st.site.products.map(mountOf))].filter(m => m !== 'none');
     $('right').innerHTML = `
       <div>
         <div class="eyebrow">설치 과정 · ${mounts.map(m => I.MOUNT_LABEL[m]).join(' · ')}</div>
@@ -364,8 +413,10 @@
   function updateCaption() {
     const cap = $('stepCap');
     if (st.tab !== 'install') { cap.hidden = true; return; }
-    const m = mountOf(st.site.products[0]);
+    const first = st.site.products.find(it => mountOf(it) !== 'none');
     cap.hidden = false;
+    if (!first) { cap.innerHTML = '<span class="n">설치 과정</span><b>제품을 선택해 주세요</b><span class="small muted">왼쪽 추천 제품 목록에서 제품을 넣으면 설치 과정을 보여줍니다.</span>'; return; }
+    const m = mountOf(first);
     cap.innerHTML = `<span class="n">STEP ${st.step + 1} / 6</span><b>${I.STEPS[st.step].title}</b><span class="small muted">${esc(I.TEXT[m][st.step])}</span>`;
   }
 
@@ -374,6 +425,7 @@
     const cards = [];
     cards.push(kpiCard('ach', '환기 횟수', '회/h'));
     if (r.pol) cards.push(kpiCard('pol', r.pol.name, r.pol.unit));
+    if (r.pm) cards.push(kpiCard('pm', r.pm.name, r.pm.unit));
     const it = s.mode === 'it';
     if (r.tempOn && !it) cards.push(kpiCard('teff', r.animal ? '체감 온도(가축)' : '체감 온도', '℃'));
     if (r.tempOn) cards.push(kpiCard('temp', it ? '서버실 평균 온도' : '실내 온도', '℃'));
@@ -381,6 +433,7 @@
     cards.push(kpiCard('kw', '설비 소비전력', 'kW'));
     const metrics = [];
     if (r.pol) metrics.push(['pol', '공기질']);
+    if (r.pm) metrics.push(['pm', '미세먼지']);
     if (r.tempOn) metrics.push(['temp', it ? '서버실 온도' : '체감 온도']);
     if (!metrics.some(m => m[0] === st.metric)) st.metric = metrics[0][0];
     const e = r.energy;
@@ -463,6 +516,7 @@
     const achNow = st.t > 0 ? r.ach : r.ach0;
     set('ach', achNow, r.ach0, 1);
     if (r.pol) set('pol', now.C, was.C, r.pol.dec, r.pol.limit);
+    if (r.pm) set('pm', now.PM, was.PM, 0, r.pm.limit);
     if (r.tempOn) { set('teff', now.Teff, was.Teff, 1, r.animal ? null : 28); set('temp', now.T, was.T, 1); }
     set('v', now.v, was.v, 2);
     set('kw', st.t > 0 ? r.energy.kW : 0, 0, 1);
@@ -475,7 +529,10 @@
     const cv = $('chart'); if (!cv) return;
     const r = st.res;
     const N = 61, after = [];
-    if (st.metric === 'pol' && r.pol) {
+    if (st.metric === 'pm' && r.pm) {
+      for (let i = 0; i < N; i++) after.push(r.at(Math.max(0.001, i)).PM);
+      X.chart(cv, { after, before: r.pm.c0, limit: r.pm.limit, t: st.t, zero: true, fmt: v => fmt(v, 0), valueAt: t => r.at(Math.max(0.001, t)).PM });
+    } else if (st.metric === 'pol' && r.pol) {
       for (let i = 0; i < N; i++) after.push(r.at(Math.max(0.001, i)).C);
       X.chart(cv, { after, before: r.pol.c0, limit: r.pol.limit, t: st.t, zero: true, fmt: v => fmt(v, r.pol.dec > 1 ? 1 : r.pol.dec), valueAt: t => r.at(Math.max(0.001, t)).C });
     } else {
@@ -513,8 +570,8 @@
           <div><span>연간 환산 효과</span><b>${r.totalBenefit > 0 ? fmt(r.totalBenefit) : '–'}</b> 만원</div>
         </div>
         <div class="tw"><table>
-          <thead><tr><th>제품</th><th>모델</th><th>설치 방식</th><th class="num">수량</th><th class="num">대당 풍량(㎥/h)</th><th class="num">대당 전력(kW)</th></tr></thead>
-          <tbody>${s.products.map(it => { const p = P[it.id]; return `<tr><td>${esc(p.name)}${p.rep ? ' *' : ''}</td><td class="num">${esc(p.model)}</td><td>${I.MOUNT_LABEL[mountOf(it)]}</td><td class="num">${st.qty[it.id]}</td><td class="num">${p.airflow ? fmt(p.airflow) : '–'}</td><td class="num">${fmt(p.power / 1000, 2)}</td></tr>`; }).join('')}</tbody>
+          <thead><tr><th>적합도</th><th>제품</th><th>모델</th><th>설치 방식</th><th class="num">수량</th><th class="num">대당 풍량(㎥/h)</th><th class="num">대당 전력(kW)</th></tr></thead>
+          <tbody>${s.products.length ? s.products.map(it => { const p = P[it.id], rt = FZ.catalog.rating(s.id, it.id); return `<tr><td>${rt ? rt.r + ' ' + FZ.catalog.RATING_LABEL[rt.r] : '–'}</td><td>${esc(p.name)}${p.rep ? ' *' : ''}</td><td class="num">${esc(p.model)}</td><td>${I.MOUNT_LABEL[mountOf(it)]}</td><td class="num">${st.qty[it.id]}</td><td class="num">${p.airflow ? fmt(p.airflow) : '–'}</td><td class="num">${p.power ? fmt(p.power / 1000, 2) : '–'}</td></tr>`; }).join('') : '<tr><td colspan="7">선택한 제품이 없습니다.</td></tr>'}</tbody>
         </table></div>
         <div class="tw"><table>
           <thead><tr><th>항목</th><th class="num">기존</th><th class="num">도입 후</th><th class="num">변화</th></tr></thead>
@@ -526,7 +583,7 @@
           </tbody>
         </table></div>
         <div class="foot">가정값: 전기요금 ${fmt(st.prm.elecPrice)}원/kWh · 배출계수 ${st.prm.co2Factor}kgCO₂/kWh · EC 절감률 ${st.prm.ecSave}% · 연 가동 ${fmt(e.hrs)}시간(부하율 80%)${r.prod && r.prod.valueLabel ? ' · ' + esc(r.prod.valueLabel) : ''}.<br>
-          본 자료는 대표 조건을 넣은 단순 모델의 참고 추정치이며 성능을 보증하지 않습니다. 제품 사양은 카탈로그 최대 성능(60Hz) 기준이고, * 표시는 대표값입니다. 정확한 선정은 현장 실측 후 팬직 기술지원팀이 진행합니다.</div>
+          본 자료는 대표 조건을 넣은 단순 모델의 참고 추정치이며 성능을 보증하지 않습니다. 적합도는 「제품별 용도 메트릭스」 기준이며, 제품 사양은 카탈로그 대표 모델(50Hz, 일부 60Hz) 기준이고 * 표시는 가정값이 포함된 제품입니다. 정확한 선정은 현장 실측 후 팬직 기술지원팀이 진행합니다.</div>
         <div class="acts"><button type="button" id="copySum" class="pri">요약 텍스트 복사</button><button type="button" id="closeSheet">닫기</button></div>
         <textarea id="copyBox" readonly hidden style="width:100%;height:160px;font:12px var(--f-mono)"></textarea>
       </div>`;
@@ -616,7 +673,7 @@
   }
 
   /* ---------- 프레임 ---------- */
-  const SPIN = { hvls: 1.4, belt: 9, propeller: 11, roof: 10, inline: 14, centrifugal: 14, circ: 12, jet: 16, ec: 13, diffuser: 0, axialStand: 12, defroster: 7 };
+  const SPIN = { hvls: 1.4, belt: 9, propeller: 11, roof: 10, inline: 14, centrifugal: 14, centrifugalSus: 14, ceilvent: 14, circ: 12, jet: 16, ec: 13, diffuser: 0, axialStand: 12, defroster: 7 };
   function spinFan(f, rate, dt) {
     if (!f.rotor) return;
     if (f.axis === 'y') f.rotor.rotation.y += rate * dt; else f.rotor.rotation.z += rate * dt;

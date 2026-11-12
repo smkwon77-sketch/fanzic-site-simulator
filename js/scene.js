@@ -155,7 +155,7 @@ window.FZ = window.FZ || {};
     s.background = new T.Color(0x0a1422);
     s.fog = new T.Fog(0x0a1422, 160, 320);
     lights(s, 70);
-    const TILE = 20, COLS = 4, ROWS = 3;
+    const TILE = 19, COLS = 5, ROWS = 3;
     const w = COLS * TILE + 8, d = ROWS * TILE + 8;
     const base = new T.Mesh(new T.BoxGeometry(w + 3, 3, d + 3), new T.MeshStandardMaterial({ color: 0x3a2a1e, roughness: 0.8 }));
     base.position.y = -1.6; base.receiveShadow = true; s.add(base);
@@ -183,7 +183,7 @@ window.FZ = window.FZ || {};
     crown.castShadow = true; s.add(crown);
 
     // 현장 미니어처
-    const order = ['factory', 'logistics', 'heavy', 'parking', 'barn', 'hq', 'greenhouse', 'kitchen', 'datacenter', 'office', 'pool', 'park'];
+    const order = ['house', 'commercial', 'hospital', 'restaurant', 'park', 'factory', 'logistics', 'hq', 'plant', 'barn', 'datacenter', 'pool', 'greenhouse', 'parking', 'park'];
     const minis = [];
     order.forEach((id, i) => {
       const t = tiles[i];
@@ -206,7 +206,7 @@ window.FZ = window.FZ || {};
       }
       const site = sites.find(x => x.id === id);
       const g = FZ.models.building(site, true);
-      const sc = 14 / Math.max(site.dims.L, site.dims.W);
+      const sc = 13 / Math.max(site.dims.L, site.dims.W);
       g.scale.setScalar(sc);
       g.position.set(t.x, 0.3, t.z);
       g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.userData.siteId = id; } });

@@ -24,6 +24,8 @@ window.FZ = window.FZ || {};
     const Qnat = c.q0 != null ? 0 : (c.ach0 || 0) * g.V; // 기존 자연환기량은 빼고 산정
     let n = 1;
     switch (s.type) {
+      case 'share': n = Math.ceil(Math.max(0, targetQ(site) - Qnat) * s.share / fq); break;
+      case 'matchWall': n = site.products.filter(o => o.place === 'wallEnd' || o.place === 'wallSide').reduce((a, o) => a + recommend(site, o), 0); break;
       case 'ach': n = Math.ceil(Math.max(0, s.target * g.V - Qnat) / fq); break;
       case 'velocity': n = Math.ceil(Math.max(0, s.target * g.cross * 3600 - Qnat) / fq); break;
       case 'cover': n = Math.ceil(g.A / p.cover); break;
@@ -35,6 +37,30 @@ window.FZ = window.FZ || {};
       case 'fixed': n = s.n; break;
     }
     return Math.max(1, Math.min(40, n));
+  }
+
+  // 현장 목표 환기량 (㎥/h) — 배기 제품들이 나눠 맡음
+  function targetQ(site) {
+    const g = geom(site), c = site.cond, t = site.target || { type: 'ach', value: 0 };
+    switch (t.type) {
+      case 'ach': return t.value * g.V;
+      case 'velocity': return t.value * g.cross * 3600;
+      case 'flowPerArea': return t.value * g.A;
+      case 'perPerson': return (c.workers || 0) * t.value;
+      case 'heat': return c.heat * 3000 / t.value;
+    }
+    return 0;
+  }
+  function targetText(site) {
+    const t = site.target, c = site.cond;
+    switch (t.type) {
+      case 'ach': return `환기횟수 ${t.value}회/h`;
+      case 'velocity': return `터널 풍속 ${t.value}m/s`;
+      case 'flowPerArea': return `바닥 1㎡당 ${t.value}㎥/h`;
+      case 'perPerson': return `1인당 ${t.value}㎥/h`;
+      case 'heat': return `IT 발열 ${c.heat}kW · 온도차 ${t.value}℃`;
+    }
+    return '';
   }
 
   function xsat(T) { // 포화 절대습도 g/kg
@@ -65,7 +91,7 @@ window.FZ = window.FZ || {};
       if (p.role === 'hvls' || p.role === 'circulate' || p.role === 'spot') {
         const frac = Math.min(1, it.n * p.cover / g.A);
         mix += p.speed * p.speed * frac;
-        if (p.role === 'hvls') { hvlsN += it.n; hvlsCover = Math.min(g.A, it.n * p.cover); }
+        if (p.role === 'hvls') { hvlsN += it.n; hvlsCover = Math.min(g.A, hvlsCover + it.n * p.cover); }
       }
     });
     const v0 = vThrough(Q0);
@@ -81,6 +107,19 @@ window.FZ = window.FZ || {};
     const tauT = Math.max(0.05, 4 * g.V / Math.max(Q, 1)); // h
     const Teff0 = T0 - (T0 > 22 ? ce(v0) : 0);
 
+    // 필터 (공기청정 환산 풍량 CADR = 대수 × 풍량 × 효율)
+    let cadr = 0;
+    items.forEach(it => { if (it.p.role === 'filter') cadr += it.n * it.p.airflow * it.p.filterEff; });
+    // 혼합 농도 모델: C∞ = (Q·C외기 + G) / (Q + CADR)
+    function mixModel(pd, useFilter) {
+      const G = (pd.c0 - pd.cOut) * Q0;
+      const k = useFilter ? cadr : 0;
+      const c1 = (Q * pd.cOut + G) / Math.max(Q + k, 1);
+      const rate = (Q + k) / g.V;
+      return { ...pd, c0: pd.c0, c1, filtered: k > 0, at: h => c1 + (pd.c0 - c1) * Math.exp(-rate * h) };
+    }
+    const pm = site.pm ? mixModel(site.pm, true) : null;
+
     // 오염물
     let pol = null;
     const pd = site.pollutant;
@@ -92,9 +131,7 @@ window.FZ = window.FZ || {};
         const rh = x => Math.min(100, 100 * x / xsat(tin));
         pol = { ...pd, c0: rh(x0), c1: rh(x1), at: h => rh(x1 + (x0 - x1) * Math.exp(-ach * h)) };
       } else {
-        const G = (pd.c0 - pd.cOut) * Q0;
-        const c1 = pd.cOut + G / Math.max(Q, 1);
-        pol = { ...pd, c0: pd.c0, c1, at: h => c1 + (pd.c0 - c1) * Math.exp(-ach * h) };
+        pol = mixModel(pd, !!pd.filterable);
       }
       // 기준 도달 시간
       pol.reachMin = null;
@@ -104,14 +141,14 @@ window.FZ = window.FZ || {};
     }
 
     function at(tMin) {
-      if (tMin <= 0) return { T: T0, Teff: Teff0, C: pol ? pol.c0 : null, v: v0 };
+      if (tMin <= 0) return { T: T0, Teff: Teff0, C: pol ? pol.c0 : null, PM: pm ? pm.c0 : null, v: v0 };
       const h = tMin / 60;
       const ramp = Math.min(1, tMin / 1.5);
       const T = T1 + (T0 - T1) * Math.exp(-h / tauT);
       const v = v0 + (v1 - v0) * ramp;
-      return { T, Teff: T - (T > 22 ? ce(v) : 0), C: pol ? pol.at(h) : null, v };
+      return { T, Teff: T - (T > 22 ? ce(v) : 0), C: pol ? pol.at(h) : null, PM: pm ? pm.at(h) : null, v };
     }
-    const end = at(60), steady = { T: T1, Teff: T1 - (T1 > 22 ? ce(v1) : 0), C: pol ? pol.c1 : null, v: v1 };
+    const end = at(60), steady = { T: T1, Teff: T1 - (T1 > 22 ? ce(v1) : 0), C: pol ? pol.c1 : null, PM: pm ? pm.c1 : null, v: v1 };
 
     // 에너지
     const load = 0.8;
@@ -181,11 +218,11 @@ window.FZ = window.FZ || {};
     const payback = prm.installCost > 0 && totalBenefit > 0 ? prm.installCost / totalBenefit : null;
 
     return {
-      site, items, g, Q0, Q, Qfan, ach0, ach, v0, v1, T0, T1, Teff0, tempOn, pol, at, end, steady,
+      site, items, g, Q0, Q, Qfan, ach0, ach, pm, cadr, targetQ: targetQ(site), v0, v1, T0, T1, Teff0, tempOn, pol, at, end, steady,
       energy: { kW, baseKW, kWh, costWon, saveKWh, saveWon, co2t, baseNotes, replaced, hrs },
       prod, totalBenefit, payback, animal
     };
   }
 
-  FZ.sim = { recommend, compute, geom, thi, xsat };
+  FZ.sim = { recommend, compute, geom, thi, xsat, targetQ, targetText };
 })();

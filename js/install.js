@@ -76,6 +76,14 @@ window.FZ = window.FZ || {};
       '온도 센서 연동 자동 컨트롤러를 결선합니다.',
       '헤드 회전·각도를 확인합니다.'
     ],
+    exterior: [
+      '배기 덕트가 외벽으로 나가는 위치와 빗물 방향을 확인합니다.',
+      '외벽을 덕트 지름에 맞춰 코어 타공합니다.',
+      '덕트 슬리브를 넣고 실리콘으로 기밀 처리합니다.',
+      '후드캡을 끼우고 스크루로 고정합니다.',
+      '전원 연결은 필요 없으며 연결 덕트를 점검합니다.',
+      '역류 방지 댐퍼 작동과 누수 여부를 확인합니다.'
+    ],
     floor: [
       '열원 주변 작업자 위치와 바람이 닿을 거리를 확인합니다.',
       '바닥 고정 위치를 표시합니다.',
@@ -85,7 +93,7 @@ window.FZ = window.FZ || {};
       '작업자 위치 풍속을 측정합니다.'
     ]
   };
-  const MOUNT_LABEL = { wall: '벽 관통형', roof: '지붕형', ceiling: '천장 매달기형', duct: '덕트 연결형', hang: '행거형', ceilingSmall: '천장 매립형', rack: '팬월(랙)형', pole: '폴 설치형', floor: '바닥 스탠드형' };
+  const MOUNT_LABEL = { wall: '벽 관통형', roof: '지붕형', ceiling: '천장 매달기형', duct: '덕트 연결형', hang: '행거형', ceilingSmall: '천장 매립형', rack: '팬월(랙)형', pole: '폴 설치형', floor: '바닥 설치형', exterior: '외벽 마감형', none: '부속(별도 설치 없음)' };
 
   // 원점에 놓인 그룹(자식이 절대 좌표)은 크기 애니메이션 없이 표시만
   function grow(o, e) { o.scale.setScalar(o.position.lengthSq() < 1e-6 ? 1 : Math.max(0.01, e)); }
