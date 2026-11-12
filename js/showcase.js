@@ -9,6 +9,7 @@ window.FZ = window.FZ || {};
   /* ---------- 썸네일 (사진 대신) ---------- */
   let thumbR = null;
   const thumbCache = {};
+  const THUMB_YAW = { inline: Math.PI - 0.6, squareInline: Math.PI - 0.6, ec: Math.PI - 0.6, cabinet: Math.PI - 0.6, cabinetMulti: Math.PI, centrifugal: -1.35, centrifugalSus: -0.05, sirocoDouble: -0.5, jet: -1.0, circ: -0.25, defroster: -0.3, belt: -0.5, propeller: -0.3 };
   SC.thumb = function (pid) {
     if (thumbCache[pid]) return thumbCache[pid];
     const p = FZ.PRODUCTS[pid];
@@ -21,9 +22,12 @@ window.FZ = window.FZ || {};
     FZ.engine.lights(scene, 6);
     const f = FZ.models.fan(p.model3d, p.size);
     const g = new T.Group(); g.add(f.group); scene.add(g);
-    const box = new T.Box3().setFromObject(g), size = box.getSize(new T.Vector3()), ctr = box.getCenter(new T.Vector3());
+    // 제품 특징이 보이는 쪽(흡입 벨마우스·흡입구 등)을 앞으로
+    if (f.axis === 'z') g.rotation.y = THUMB_YAW[p.model3d] != null ? THUMB_YAW[p.model3d] : -0.6;
+    g.updateMatrixWorld(true);
+    const focus = f.group.getObjectByName('thumbFocus') || g; // 서리방지팬처럼 기둥이 긴 제품은 헤드만
+    const box = new T.Box3().setFromObject(focus), size = box.getSize(new T.Vector3()), ctr = box.getCenter(new T.Vector3());
     g.position.sub(ctr);
-    if (f.axis === 'z') g.rotation.y = -0.6;
     const r = Math.max(size.x, size.y, size.z);
     const cam = new T.PerspectiveCamera(32, 4 / 3, 0.01, 100);
     cam.position.set(r * 1.1, r * 0.75, r * 1.9); cam.lookAt(0, 0, 0);
