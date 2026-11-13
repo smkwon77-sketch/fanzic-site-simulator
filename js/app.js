@@ -699,9 +699,9 @@
   /* ---------- 적합도 표 ---------- */
   function openMatrix() {
     const uses = FZ.USES, ids = Object.keys(P);
-    $('sheet').innerHTML = `<div class="paper" role="dialog" aria-label="제품 × 용도 적합도 표">
+    $('sheet').innerHTML = `<div class="paper wide" role="dialog" aria-label="제품 × 용도 적합도 표">
       <div class="meta"><div><div class="eyebrow" style="color:#5a6b80">제품 × 용도</div><h2>적합도 한눈에 보기</h2>
-        <p style="font-size:12px;color:#5a6b80">◎ 최적 · ○ 적합 · △ 가능 (「제품별 용도 메트릭스」), 점선 칸은 메트릭스 외(브로셔 용도 기준). 칸을 누르면 그 조합으로 시뮬레이션, 제품명을 누르면 제품 설명으로 갑니다.</p></div>
+        <p style="font-size:12px;color:#5a6b80">◎ 최적 · ○ 적합 · △ 가능 (「제품별 용도 메트릭스」), 점선 칸은 메트릭스 외(카탈로그 용도 기준). 칸을 누르면 그 조합으로 시뮬레이션, 제품명을 누르면 제품 설명으로 갑니다.</p></div>
         <div class="acts"><button type="button" id="closeMx">닫기</button></div></div>
       <div class="tw"><table class="mx"><thead><tr><th>제품</th>${uses.map(u => `<th>${esc(u.label)}</th>`).join('')}</tr></thead><tbody>
         ${ids.map(id => `<tr><td><button type="button" class="pn" data-mxp="${id}">${esc(P[id].name)}</button></td>${uses.map(u => { const r = FZ.catalog.rating(u.id, id); return `<td>${r ? `<button type="button" class="${r.src === 'extra' ? 'x' : RCLS[r.r]}" data-mxu="${u.id}" data-mxi="${id}" title="${esc(u.label)} · ${esc(P[id].name)}">${r.r}</button>` : ''}</td>`; }).join('')}</tr>`).join('')}

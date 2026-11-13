@@ -262,7 +262,9 @@ details.assume summary { cursor: pointer; font-weight: 600; font-size: 13px; }
 .mx td button.r1 { background: rgba(31, 99, 181, 0.12); color: var(--accent); }
 .mx td button.r2 { background: rgba(91, 107, 128, 0.12); color: var(--muted); }
 .mx td button.x { background: rgba(31, 99, 181, 0.04); color: var(--accent); outline: 1px dashed rgba(31, 99, 181, 0.4); }
-.mx .pn { background: none; border: 0; padding: 0; color: var(--accent); font-weight: 600; text-align: left; }
+.mx .pn { background: none; border: 0; padding: 0; color: var(--accent); font-weight: 600; text-align: left; width: auto; height: auto; white-space: nowrap; }
+.mx th:first-child, .mx td:first-child { position: sticky; left: 0; background: #fff; z-index: 1; padding-right: 10px; }
+.paper.wide { max-width: 1120px; }
 
 @media (prefers-reduced-motion: reduce) { #fade { transition: none; } }
 @media (max-width: 1180px) {
