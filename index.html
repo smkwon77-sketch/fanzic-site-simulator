@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>팬직 현장 시뮬레이터</title>
+<title>팬직 제품 시뮬레이터</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="description" content="환경 조건에 맞는 팬직 제품을 실물 사진으로 추천하고, 흡기·배기 효과와 설치 과정을 3D로 보여주는 영업 상담·학습용 시뮬레이터">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -131,6 +131,15 @@ p { margin: 0; }
 .specs div { background: var(--panel-2); border-radius: 6px; padding: 5px 7px; }
 .specs span { display: block; font-size: 10px; color: var(--muted); }
 .specs em { font-style: normal; font-family: var(--f-mono); font-size: 12px; }
+.specsel { display: flex; flex-direction: column; gap: 3px; }
+.specsel select { width: 100%; font: inherit; font-size: 12px; padding: 5px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--fg); }
+.spect { width: 100%; border-collapse: collapse; font-size: 11px; }
+.spect th { text-align: left; color: var(--muted); font-weight: 600; padding: 4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.spect td { padding: 5px 4px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+.spect .num { text-align: right; font-family: var(--f-mono); }
+.spect tbody tr { cursor: pointer; }
+.spect tbody tr:hover td { background: var(--panel-2); }
+.spect tr.on td { background: var(--accent-a); font-weight: 700; }
 .feat { margin: 0; padding-left: 16px; font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
 .flowkey { display: flex; gap: 12px; font-size: 12px; color: var(--muted); }
 .flowkey i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
@@ -286,13 +295,14 @@ details.assume summary { cursor: pointer; font-weight: 600; font-size: 13px; }
 <body>
 <header class="top">
   <img class="logo" id="logo" alt="FANZIC" title="처음 화면">
-  <h1>현장 시뮬레이터</h1>
+  <h1>제품 시뮬레이터</h1>
   <nav class="modes" aria-label="보기 방식">
     <button type="button" data-mode="env" aria-pressed="false">환경에서 찾기</button>
     <button type="button" data-mode="product" aria-pressed="false">제품에서 찾기</button>
     <button type="button" data-mode="matrix" aria-pressed="false">적합도 표</button>
   </nav>
   <span class="sp"></span>
+  <span class="seg" role="group" aria-label="전원 주파수"><button type="button" data-hz="60" aria-pressed="true">60Hz</button><button type="button" data-hz="50" aria-pressed="false">50Hz</button></span>
   <span class="tag">영업 상담·학습용 · 참고 추정치</span>
 </header>
 
@@ -313,7 +323,7 @@ details.assume summary { cursor: pointer; font-weight: 600; font-size: 13px; }
   <div class="home-in">
     <img id="homeLogo" alt="FANZIC">
     <div>
-      <div class="eyebrow">팬직 현장 시뮬레이터</div>
+      <div class="eyebrow">팬직 제품 시뮬레이터</div>
       <h1>무엇부터 볼까요?</h1>
     </div>
     <div class="choices">
@@ -339,6 +349,7 @@ details.assume summary { cursor: pointer; font-weight: 600; font-size: 13px; }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="data/logo.js"></script>
 <script src="data/products.js"></script>
+<script src="data/specs.js"></script>
 <script src="data/tags.js"></script>
 <script src="data/matrix.js"></script>
 <script src="data/sites.js"></script>

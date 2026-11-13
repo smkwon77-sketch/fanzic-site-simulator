@@ -107,7 +107,7 @@ window.FZ = window.FZ || {};
     frp: fmat(0x8c9e85, 0.1, 0.4, { env: 0.45 }),            // 연녹색 벨마우스
     panel: fmat(0xe9ecef, 0.45, 0.32),
     white: fmat(0xf1f2f3, 0.05, 0.4, { env: 0.45 }),
-    cream: fmat(0xe6e1d0, 0.05, 0.45, { env: 0.3 }),
+    cream: fmat(0xf0efe9, 0.05, 0.55, { env: 0.3 }),
     teal: fmat(0x14a1ab, 0.3, 0.38, { env: 0.6 }),
     orange: fmat(0xf2551f, 0.25, 0.38, { env: 0.6 }),
     blue: fmat(0x1d47b4, 0.35, 0.36, { env: 0.6 }),
@@ -384,6 +384,34 @@ window.FZ = window.FZ || {};
     return { g, rotor };
   }
 
+  /* 철망·타공판 투명 무늬 텍스처 (alphaTest 로 구멍 표현) */
+  const TEXC = {};
+  function meshTex(kind) {
+    if (TEXC[kind]) return TEXC[kind];
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const x = c.getContext('2d');
+    if (kind === 'diamond') { // 확장 철망(마름모)
+      x.strokeStyle = '#ffffff'; x.lineWidth = 9;
+      for (let i = -128; i <= 256; i += 32) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i + 64, 128); x.stroke(); x.beginPath(); x.moveTo(i + 64, 0); x.lineTo(i, 128); x.stroke(); }
+    } else { // 사각 타공
+      x.fillStyle = '#ffffff'; x.fillRect(0, 0, 128, 128);
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) x.clearRect(i * 32 + 7, j * 32 + 7, 18, 18);
+    }
+    const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping;
+    return (TEXC[kind] = t);
+  }
+  function meshPanel(w, h, kind, color, rep, circle) {
+    const t = meshTex(kind).clone(); t.needsUpdate = true; t.repeat.set(w * rep, h * rep);
+    const m = new T.MeshStandardMaterial({ color, metalness: 0.7, roughness: 0.35, envMap: ENV, alphaMap: t, alphaTest: 0.5, side: DS });
+    return new T.Mesh(circle ? new T.CircleGeometry(circle, 48) : new T.PlaneGeometry(w, h), m);
+  }
+  // 제어기 앞판 등 그림 텍스처
+  function panelTex(draw, w = 256, h = 384) {
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    draw(c.getContext('2d'), w, h);
+    return new T.CanvasTexture(c);
+  }
+
   /* 판형 고압팬(정사각 판 + 원형 벤투리 + 날개 + 뒤쪽 가드 망). 토출 = +z */
   function propFan(s, o) {
     const g = new T.Group(), R = s * 0.43;
@@ -510,24 +538,27 @@ window.FZ = window.FZ || {};
       g.add(rotor);
     } else if (kind === 'inline') {
       // 사류(혼류) 원형 덕트팬: 좁은 흡입관(-z) → 원뿔 확관 → 몸통(+z), 회녹색
-      const r = s * 0.5, ri = s * 0.38, L = s * 0.95;
+      const r = s * 0.5, ri = s * 0.38, L = s * 0.95, SG = fmat(0xc9d0c6, 0.3, 0.4, { env: 0.75 });
       const z0 = -L / 2, z1 = z0 + L * 0.34, z2 = z1 + L * 0.2, z3 = L / 2;
-      const inl = tubeZ(ri, ri, z1 - z0, FC.sage); inl.position.z = (z0 + z1) / 2; g.add(inl);
-      g.add(latheZ([[ri, z1], [r, z2]], FC.sage));
-      const body = tubeZ(r, r, z3 - z2, FC.sage); body.position.z = (z2 + z3) / 2; g.add(body);
-      g.add(torusZ(ri + s * 0.015, s * 0.018, FC.sage, z0));
-      g.add(torusZ(r + s * 0.015, s * 0.018, FC.sage, z3));
-      g.add(torusZ(r, s * 0.014, FC.sage, z2));
+      const inl = tubeZ(ri, ri, z1 - z0, SG); inl.position.z = (z0 + z1) / 2; g.add(inl);
+      g.add(latheZ([[ri, z1], [r, z2]], SG));
+      const body = tubeZ(r, r, z3 - z2, SG); body.position.z = (z2 + z3) / 2; g.add(body);
+      g.add(torusZ(ri + s * 0.015, s * 0.018, SG, z0));
+      g.add(torusZ(r + s * 0.015, s * 0.018, SG, z3));
+      g.add(torusZ(r, s * 0.014, SG, z2));
       for (let i = 0; i < 8; i++) {
         const a = i / 8 * TAU + 0.2, bo = cyl(s * 0.012, s * 0.012, s * 0.02, MAT.yellow, 8);
         bo.position.set(Math.cos(a) * (r * 0.9 + ri * 0.1), Math.sin(a) * (r * 0.9 + ri * 0.1), z2 - s * 0.02); bo.rotation.x = PI / 2; g.add(bo);
       }
-      rotor = blades({ n: 7, r0: s * 0.09, r1: ri * 0.96, w0: s * 0.09, w1: ri * 0.55, sweep: ri * 0.25, pitch: 0.6, m: FC.sageLight, hubR: s * 0.1, hubLen: s * 0.12, hubMat: FC.white, cap: 0.5, capMat: FC.white });
+      rotor = blades({ n: 7, r0: s * 0.09, r1: ri * 0.96, w0: s * 0.09, w1: ri * 0.55, sweep: ri * 0.25, pitch: 0.6, m: FC.graphite, hubR: s * 0.1, hubLen: s * 0.12, hubMat: FC.white, cap: 0.5, capMat: FC.white });
       rotor.position.z = z0 + L * 0.12; g.add(rotor);
-      const mot = tubeZ(s * 0.17, s * 0.17, L * 0.4, FC.sageLight, 28, false); mot.position.z = L * 0.15; g.add(mot);
-      for (let i = 0; i < 8; i++) { const v = box(s * 0.006, r - s * 0.17, L * 0.25, FC.sage); const a = new T.Group(); v.position.y = (r + s * 0.17) / 2; v.rotation.y = 0.25; a.add(v); a.rotation.z = i / 8 * TAU; a.position.z = L * 0.28; g.add(a); }
-      const jb = box(s * 0.12, s * 0.08, s * 0.14, FC.sage); jb.position.set(r * 0.72, r * 0.72, z2 + s * 0.1); jb.rotation.z = -PI / 4; g.add(jb);
+      const mot = tubeZ(s * 0.17, s * 0.17, L * 0.4, FC.graphite, 28, false); mot.position.z = L * 0.15; g.add(mot);
+      for (let i = 0; i < 8; i++) { const v = box(s * 0.006, r - s * 0.17, L * 0.25, SG); const a = new T.Group(); v.position.y = (r + s * 0.17) / 2; v.rotation.y = 0.25; a.add(v); a.rotation.z = i / 8 * TAU; a.position.z = L * 0.28; g.add(a); }
+      const jb = box(s * 0.12, s * 0.08, s * 0.14, SG); jb.position.set(r * 0.72, r * 0.72, z2 + s * 0.1); jb.rotation.z = -PI / 4; g.add(jb);
       const br = box(s * 0.16, s * 0.025, s * 0.06, FC.wire); br.position.set(r + s * 0.06, 0, z2 + s * 0.06); g.add(br);
+      // 검정 8각 방진 받침
+      [-1, 1].forEach(k => { const p = box(s * 0.04, s * 0.32, L * 0.32, FC.black); p.position.set(k * r * 0.62, -r * 0.62, z2 - L * 0.05); p.rotation.z = k * 0.55; g.add(p); });
+      const sb = box(r * 0.7, s * 0.04, L * 0.32, FC.black); sb.position.set(0, -r - s * 0.08, z2 - L * 0.05); g.add(sb);
     } else if (kind === 'squareInline') {
       // 사각 인라인(박스) 덕트팬: 흰 상자, 흡입면(-z)에 연녹색 벨마우스 + 후향 임펠러
       const D = s * 0.92, t = s * 0.015;
@@ -547,14 +578,14 @@ window.FZ = window.FZ || {};
       const mot = tubeZ(s * 0.14, s * 0.14, s * 0.22, FC.graphite, 24, false); mot.position.z = D / 2 - s * 0.22; g.add(mot);
       [0, PI / 2].forEach(a => { const bar = box(s * 0.94, s * 0.03, s * 0.03, FC.galv); bar.rotation.z = a; bar.position.z = D / 2 - s * 0.12; g.add(bar); });
       // rotor 는 rw 안에서 z축 회전 (rotation.y=PI 로 뒤집혀 있어도 z축 회전은 그대로)
-    } else if (kind === 'centrifugal' || kind === 'centrifugalSus' || kind === 'sirocoDouble') {
+    } else if (kind === 'centrifugal' || kind === 'centrifugalSus' || kind === 'sirocoDouble' || kind === 'sirocoFrame') {
       // 시로코(원심) 송풍기: 판금 스크롤, 축 = x, 흡입 = +x 옆면, 토출 = 위쪽에서 +z
       const torX = (r, tt, m, x) => { const o = new T.Mesh(new T.TorusGeometry(r, tt, 8, 64), m); o.rotation.y = PI / 2; o.position.x = x; return o; };
       const discX = (r, m, x, dir) => { const o = new T.Mesh(new T.CircleGeometry(r, 48), m); o.rotation.y = dir > 0 ? PI / 2 : -PI / 2; o.position.x = x; return o; };
       const holderX = () => { const h = new T.Group(); h.rotation.y = -PI / 2; g.add(h); return h; }; // 안쪽 z 축 → 바깥 -x... (z 를 x 축에 맞춤)
       if (kind === 'sirocoDouble') {
         // 양흡입 다익(DIDW): 스크롤 모양 측판 2장 + 감싼 외피, 앞 위 사각 토출구(플랜지), 양쪽 흡입 링, 한쪽 흡입구에 모터(3암)
-        const m = FC.sageLight, R0 = s * 0.27, R1 = s * 0.45, w = s * 0.62, t = s * 0.012, hr = s * 0.25;
+        const m = fmat(0xc3cabe, 0.3, 0.42, { env: 0.7 }), R0 = s * 0.27, R1 = s * 0.45, w = s * 0.62, t = s * 0.012, hr = s * 0.25;
         const ol = voluteOutline(R0, R1, s * 0.42, 1.2);
         [1, -1].forEach(k => { const p = sideShapeX(ol, [{ r: hr }], t, m); p.position.x = k > 0 ? w / 2 : -w / 2 - t; g.add(p); g.add(torX(hr + s * 0.012, s * 0.02, m, k * (w / 2 + t))); });
         g.add(ribbonX([...ol.spiral, ol.mouth[0]], w, m));
@@ -563,14 +594,24 @@ window.FZ = window.FZ || {};
         const oy = (R1 + ol.yc) / 2, oh = R1 - ol.yc, oz = s * 0.42;
         [[0, oh / 2 + s * 0.025, w + s * 0.1, s * 0.05], [0, -oh / 2 - s * 0.025, w + s * 0.1, s * 0.05]].forEach(([x, y, ww, hh]) => { const b = box(ww, hh, t, m); b.position.set(x, oy + y, oz); g.add(b); });
         [-1, 1].forEach(k => { const b = box(s * 0.05, oh + s * 0.1, t, m); b.position.set(k * (w / 2 + s * 0.025), oy, oz); g.add(b); });
-        for (let i = 0; i < 6; i++) { const b = cyl(s * 0.008, s * 0.008, t * 2, FC.black, 6); b.rotation.x = PI / 2; b.position.set(-w / 2 - s * 0.02 + (w + s * 0.04) * i / 5, oy + oh / 2 + s * 0.03, oz + t); g.add(b); }
+        // 깊은 사각 토출 덕트 + 밖으로 꺾인 플랜지(긴 구멍)
+        const dd = s * 0.12;
+        [-1, 1].forEach(k => { const hw = box(w, t, dd, m); hw.position.set(0, oy + k * oh / 2, oz + dd / 2); g.add(hw); const vw = box(t, oh, dd, m); vw.position.set(k * w / 2, oy, oz + dd / 2); g.add(vw); });
+        [[0, oh / 2 + s * 0.035, w + s * 0.14, s * 0.07], [0, -oh / 2 - s * 0.035, w + s * 0.14, s * 0.07]].forEach(([x, y, ww, hh]) => { const b = box(ww, hh, t, m); b.position.set(x, oy + y, oz + dd); g.add(b); });
+        [-1, 1].forEach(k => { const b = box(s * 0.07, oh + s * 0.14, t, m); b.position.set(k * (w / 2 + s * 0.035), oy, oz + dd); g.add(b); });
+        for (let i = 0; i < 4; i++) [-1, 1].forEach(k => { const sl = box(s * 0.035, s * 0.016, t * 1.5, FC.shade); sl.position.set(-w * 0.36 + i * w * 0.24, oy + k * (oh / 2 + s * 0.035), oz + dd + t * 0.3); g.add(sl); });
+        [-1, 1].forEach(k => [-0.3, 0.3].forEach(j => { const sl = box(s * 0.016, s * 0.035, t * 1.5, FC.shade); sl.position.set(k * (w / 2 + s * 0.035), oy + j * oh, oz + dd + t * 0.3); g.add(sl); }));
         // 드럼 임펠러
         const h = holderX(); const imp = sirocoDrum(s * 0.235, w * 0.93, 44, FC.galvLight, FC.galv, FC.shade); h.add(imp); rotor = spinLink(imp, 'z');
         // 모터: 흡입구 가운데, 3암 브래킷 + 검정 단자함
         const mot = cyl(s * 0.11, s * 0.11, s * 0.24, FC.galvLight, 32); mot.rotation.z = PI / 2; mot.position.x = w / 2 - s * 0.04; g.add(mot);
         const cap = cyl(s * 0.115, s * 0.115, s * 0.03, FC.black, 32); cap.rotation.z = PI / 2; cap.position.x = w / 2 + s * 0.08; g.add(cap);
         const shaft = cyl(s * 0.03, s * 0.03, s * 0.04, FC.sus, 16); shaft.rotation.z = PI / 2; shaft.position.x = w / 2 + s * 0.1; g.add(shaft);
-        for (let i = 0; i < 3; i++) { const a = i / 3 * TAU + 0.5; const arm = box(s * 0.02, hr - s * 0.1, s * 0.035, FC.black); const ag = new T.Group(); arm.position.y = (hr + s * 0.1) / 2; ag.add(arm); ag.rotation.x = a; ag.position.x = w / 2 + t + s * 0.01; g.add(ag); }
+        // 별 모양 모터 브래킷(은색) + 3암
+        const star = new T.Shape(); for (let i = 0; i <= 24; i++) { const a = i / 24 * TAU, rr = i % 2 ? s * 0.12 : s * 0.155; i ? star.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : star.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+        const sg = new T.ExtrudeGeometry(star, { depth: s * 0.01, bevelEnabled: false }); sg.rotateY(PI / 2);
+        const stM = new T.Mesh(sg, FC.galvLight); stM.position.x = w / 2 + s * 0.06; g.add(stM);
+        for (let i = 0; i < 3; i++) { const a = i / 3 * TAU + 0.5; const arm = box(s * 0.025, hr - s * 0.12, s * 0.03, FC.galvLight); const ag = new T.Group(); arm.position.y = (hr + s * 0.12) / 2; ag.add(arm); ag.rotation.x = a; ag.position.x = w / 2 + t + s * 0.01; g.add(ag); }
         const tb = box(s * 0.05, s * 0.11, s * 0.09, FC.black); tb.position.set(w / 2 + t + s * 0.03, s * 0.28, -s * 0.24); g.add(tb);
         // 사다리꼴 벤딩 다리 2개
         [-1, 1].forEach(k => {
@@ -616,7 +657,7 @@ window.FZ = window.FZ || {};
         const bg = box(s * 0.06, Lb + s * 0.2, s * 0.16, FC.yellow); bg.position.set(-w / 2 - s * 0.26, dy / 2, dz / 2); bg.rotation.x = Math.atan2(dz, dy); g.add(bg);
       } else {
         // TFB 단흡입 시로코(SUS): 사각 측판 2장(테두리 꺾임·볼트) 사이 스크롤 외피, 앞 위 원형 토출 칼라, 옆판 흡입 링, 아래 받침 앵글
-        const m = fmat(0xbcc5be, 0.3, 0.45, { env: 0.7 }), R0 = s * 0.27, R1 = s * 0.43, w = s * 0.52, t = s * 0.012, hr = s * 0.21;
+        const m = kind === 'sirocoFrame' ? fmat(0x97a399, 0.35, 0.45, { env: 0.7 }) : fmat(0xbcc5be, 0.3, 0.45, { env: 0.7 }), R0 = s * 0.27, R1 = s * 0.43, w = s * 0.52, t = s * 0.012, hr = s * 0.21;
         const zf = s * 0.41, y0 = -s * 0.6, y1 = R1 + s * 0.04, zb = -R1 - s * 0.05;
         const ol = voluteOutline(R0, R1, zf, 1.0);
         const pin = rectPlateX(zb, zf, y0, y1, [{ u: 0, v: 0, r: hr }], t, m, s * 0.035); pin.position.x = w / 2; g.add(pin);
@@ -646,13 +687,19 @@ window.FZ = window.FZ || {};
     } else if (kind === 'cabinet' || kind === 'cabinetMulti') {
       // 캐비닛 시로코: 상자, 흡입면(-z) 원형 칼라 안으로 드럼 임펠러, 토출면(+z)
       const multi = kind === 'cabinetMulti';
-      const W = s, H = multi ? s * 0.92 : s * 0.82, D = multi ? s * 0.95 : s * 0.85, t = s * 0.012, hm = multi ? FC.sage : FC.panel;
+      const W = s, H = multi ? s * 0.92 : s * 0.82, D = multi ? s * 0.95 : s * 0.85, t = s * 0.012, hm = multi ? FC.sage : fmat(0x9ea4a2, 0.3, 0.5, { env: 0.55 });
       [-1, 1].forEach(k => { const p = box(W, t, D, hm); p.position.y = k * H / 2; g.add(p); const q = box(t, H, D, hm); q.position.x = k * W / 2; g.add(q); });
-      g.add(edgeFrame(W, H, D, s * 0.02, multi ? FC.sage : FC.galvLight));
+      g.add(edgeFrame(W, H, D, s * 0.02, hm));
       const cr = s * 0.29;
       const front = plate(W, H, [{ r: cr }], t, hm); front.position.z = -D / 2; g.add(front);
-      const col = tubeZ(cr, cr, s * 0.08, FC.galv); col.position.z = -D / 2 - s * 0.04; g.add(col);
-      g.add(torusZ(cr, s * 0.014, FC.galv, -D / 2 - s * 0.08));
+      const col = tubeZ(cr, cr, s * 0.08, multi ? FC.galv : FC.white); col.position.z = -D / 2 - s * 0.04; g.add(col);
+      g.add(torusZ(cr, s * 0.014, multi ? FC.galv : FC.white, -D / 2 - s * 0.08));
+      if (!multi) { // 리벳 줄·긴 슬롯
+        const rv = []; for (let i = 0; i < 9; i++) rv.push([-D / 2 + s * 0.04 + i * (D - s * 0.08) / 8, H / 2 - s * 0.025]);
+        g.add(boltsX(rv, s * 0.008, FC.galvLight, -W / 2 - t)); g.add(boltsX(rv, s * 0.008, FC.galvLight, W / 2 + t));
+        for (let i = 0; i < 7; i++) { const b = cyl(s * 0.008, s * 0.008, s * 0.01, FC.galvLight, 6); b.rotation.x = PI / 2; b.position.set(-W / 2 + s * 0.05 + i * (W - s * 0.1) / 6, H / 2 - s * 0.025, -D / 2 - t); g.add(b); }
+        [-1, 1].forEach(k => [-1, 1].forEach(j => { const sl = box(s * 0.04, s * 0.018, s * 0.004, FC.shade); sl.position.set(k * (W / 2 - s * 0.06), j * (H / 2 - s * 0.1), -D / 2 - t); g.add(sl); }));
+      }
       const back = plate(W, H, [{ w: s * 0.5, h: s * 0.36, y: s * 0.12 }], t, hm); back.position.z = D / 2; g.add(back);
       if (multi) {
         // 옆면(-x) 다중 토출 포트 3개
@@ -667,6 +714,7 @@ window.FZ = window.FZ || {};
       const inner = box(W * 0.96, H * 0.96, s * 0.01, FC.shade); inner.position.z = s * 0.1; g.add(inner);
       const holder = new T.Group(); holder.rotation.y = -PI / 2; holder.position.z = -D / 2 + s * 0.3; g.add(holder);
       const imp = drum(s * 0.24, s * 0.62, 40, FC.galvLight, FC.galv); holder.add(imp);
+      if (!multi) imp.add(torusZ(s * 0.24, s * 0.012, FC.galv, 0)); // 2연 드럼 가운데 칸막이
       rotor = spinLink(imp, 'z');
       // 옆면 점검 해치 + 윗면 원판
       if (!multi) {
@@ -705,7 +753,7 @@ window.FZ = window.FZ || {};
       rotor = blades({ n: 9, r0: s * 0.09, r1: r * 0.95, w0: s * 0.07, w1: s * 0.16, sweep: s * 0.08, pitch: 0.6, m: FC.cream, hubR: s * 0.1, hubLen: s * 0.12, hubMat: FC.cream, cap: 0.7 });
       rotor.position.z = -L / 2 + s * 0.3; g.add(rotor);
       const hz = (zA + zB) / 2 + s * 0.35;
-      const hm = fmat(0xd9d3bf, 0.05, 0.5, { env: 0.25 });
+      const hm = fmat(0xcfc8b2, 0.05, 0.55, { env: 0.2 });
       [-1, 1].forEach(k => { const p = box(s * 0.1, s * 1.0, s * 0.07, hm); p.position.set(0, r + s * 0.5, hz + k * s * 0.28); g.add(p); });
       const topB = box(s * 0.12, s * 0.08, s * 0.64, hm); topB.position.set(0, r + s * 1.0, hz); g.add(topB);
       const midB = box(s * 0.16, s * 0.12, s * 0.5, FC.cream); midB.position.set(0, r + s * 0.18, hz); g.add(midB);
@@ -734,8 +782,8 @@ window.FZ = window.FZ || {};
         const neck = cyl(r * 0.5, r * 0.5, s * 0.12, FC.galvLight, 40, true); neck.position.y = s * 0.06; g.add(neck);
       }
       rotor = new T.Group();
-    } else if (kind === 'axialStand' || kind === 'axialStandBlue') {
-      const blue = kind === 'axialStandBlue', m = blue ? FC.blue : FC.orange, r = s * 0.5;
+    } else if (kind === 'axialStand' || kind === 'axialStandBlue' || kind === 'axialStandGrey' || kind === 'portableFrame') {
+      const blue = kind === 'axialStandBlue' || kind === 'axialStandGrey', m = kind === 'axialStandGrey' ? fmat(0xb9c0c4, 0.5, 0.4) : kind === 'portableFrame' ? fmat(0xf2c200, 0.3, 0.32, { env: 0.8 }) : blue ? FC.blue : FC.orange, r = s * 0.5;
       const len = blue ? s * 0.62 : s * 0.5;
       const ad = axialDrum(s, m, len); g.add(ad.g); rotor = ad.rot;
       const fy = -r - s * (blue ? 0.36 : 0.18), px = r + s * 0.07;
@@ -763,7 +811,7 @@ window.FZ = window.FZ || {};
         const fork = box(s * 0.03, cr, s * 0.03, FC.galv); fork.position.set(a * bx, fy - cr * 0.6, b * bz); g.add(fork);
         const wh = cyl(cr, cr, cr * 0.6, blue ? FC.red : MAT.rubber, 16); wh.rotation.z = PI / 2; wh.position.set(a * bx, fy - cr * 1.2, b * bz); g.add(wh);
       });
-      if (blue) {
+      if (kind === 'axialStandBlue') {
         // 빨간 인양고리 + 제어함 + 크랭크 손잡이
         const eye = new T.Mesh(new T.TorusGeometry(s * 0.06, s * 0.016, 8, 20), FC.red); eye.position.set(0, r + s * 0.1, s * 0.12); g.add(eye);
         const eb = box(s * 0.06, s * 0.05, s * 0.06, FC.red); eb.position.set(0, r + s * 0.03, s * 0.12); g.add(eb);
@@ -838,7 +886,8 @@ window.FZ = window.FZ || {};
         const fp = box(W * 1.02, H * 1.02, s * 0.02, FC.teal); fp.position.z = D / 2; g.add(fp);
         const col = tubeZ(s * 0.33, s * 0.33, s * 0.12, FC.teal, 48); col.position.z = D / 2 + s * 0.06; g.add(col);
         g.add(discZ(s * 0.33, FC.shade, D / 2 + s * 0.012));
-        for (let i = -7; i <= 7; i++) { const p = box(s * 0.006, s * 0.6 * Math.sqrt(1 - (i / 7.6) ** 2), s * 0.01, FC.black); p.position.set(i * s * 0.042, 0, D / 2 + s * 0.018); g.add(p); }
+        const fm = meshPanel(s * 0.64, s * 0.64, 'diamond', 0x2a3036, 14, s * 0.32); fm.position.z = D / 2 + s * 0.016; g.add(fm);
+        [-1, 1].forEach(k => { const x = box(s * 0.64, s * 0.006, s * 0.006, FC.teal); x.rotation.z = k * 0.6; x.position.z = D / 2 + s * 0.02; g.add(x); });
         [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(([a, b]) => { const d = cyl(s * 0.01, s * 0.01, s * 0.01, FC.galv, 8); d.rotation.x = PI / 2; d.position.set(a * W * 0.47, b * H * 0.47, D / 2 + s * 0.012); g.add(d); });
       }
       rotor = null;
@@ -855,6 +904,267 @@ window.FZ = window.FZ || {};
       louv.position.z = s * 0.03; g.add(louv);
       g.add(discZ(s * 0.3, FC.shade, s * 0.005));
       rotor = null;
+    } else if (kind === 'sirocoBox') {
+      // 소형·미니 시로코팬(TFB, 쇼룸): 연회녹 닫힌 상자, 앞면 위쪽 큰 원형 토출 칼라, 옆면(+x) 흡입 칼라, 반대쪽 모터 돌출
+      const m = fmat(0xb3bcb1, 0.35, 0.42, { env: 0.75 }), W = s * 0.62, H = s * 0.95, D = s * 0.85, t = s * 0.012;
+      [-1, 1].forEach(k => { const p = box(W, t, D, m); p.position.y = k * H / 2; g.add(p); });
+      g.add(edgeFrame(W, H, D, s * 0.018, m));
+      const cr = W * 0.43, cy = H / 2 - cr - s * 0.06;
+      const front = plate(W, H, [{ r: cr, y: cy }], t, m); front.position.z = D / 2; g.add(front);
+      const backP = box(W, H, t, m); backP.position.z = -D / 2; g.add(backP);
+      const col = tubeZ(cr, cr, s * 0.1, m, 48); col.position.set(0, cy, D / 2 + s * 0.05); g.add(col);
+      const lip = torusZ(cr + s * 0.006, s * 0.014, m, D / 2 + s * 0.1); lip.position.y = cy; g.add(lip);
+      const fl = new T.Mesh(new T.RingGeometry(cr, cr + s * 0.035, 48), m); fl.position.set(0, cy, D / 2 + s * 0.008); g.add(fl);
+      const inner = discZ(cr * 0.98, FC.shade, D / 2 - s * 0.25); inner.position.y = cy; g.add(inner);
+      // 옆면(+x) 흡입판 + 칼라 + 안쪽 드럼
+      const ir = s * 0.2, iz = -s * 0.04, iy = -s * 0.06;
+      const sp = rectPlateX(-D / 2, D / 2, -H / 2, H / 2, [{ u: iz, v: iy, r: ir }], t, m, 0); sp.position.x = W / 2; g.add(sp);
+      const ic = cyl(ir, ir, s * 0.07, m, 40, true); ic.rotation.z = PI / 2; ic.position.set(W / 2 + s * 0.035, iy, iz); g.add(ic);
+      const it = new T.Mesh(new T.TorusGeometry(ir, s * 0.012, 6, 48), m); it.rotation.y = PI / 2; it.position.set(W / 2 + s * 0.07, iy, iz); g.add(it);
+      const holder = new T.Group(); holder.rotation.y = -PI / 2; holder.position.set(0, iy, iz); g.add(holder);
+      const imp = sirocoDrum(ir * 0.92, W * 0.75, 36, FC.galvLight, FC.galv, FC.shade); holder.add(imp); rotor = spinLink(imp, 'z');
+      const sp2 = box(t, H, D, m); sp2.position.x = -W / 2; g.add(sp2);
+      const mot = cyl(s * 0.14, s * 0.14, s * 0.07, m, 32); mot.rotation.z = PI / 2; mot.position.set(-W / 2 - s * 0.035, iy, iz); g.add(mot);
+      // 리벳·긴 구멍
+      const rv = []; for (let i = 0; i < 6; i++) rv.push([-D / 2 + s * 0.05 + i * (D - s * 0.1) / 5, H / 2 - s * 0.03], [-D / 2 + s * 0.05 + i * (D - s * 0.1) / 5, -H / 2 + s * 0.03]);
+      g.add(boltsX(rv, s * 0.009, FC.galvLight, W / 2 + t));
+      [-1, 1].forEach(k => { const sl = box(s * 0.004, s * 0.025, s * 0.06, FC.shade); sl.position.set(W / 2 + t, k * (H / 2 - s * 0.12), -D / 2 + s * 0.08); g.add(sl); });
+    } else if (kind === 'propSmall' || kind === 'propBarn') {
+      const barn = kind === 'propBarn';
+      if (!barn) {
+        // 소형 고압팬(쇼룸): 엠보싱 아연도 판 + 3엽 + 뒤쪽 U자 모터 브래킷 + 동심원 가드(X 와이어)
+        const R = s * 0.4, pm = fmat(0xd1d6db, 0.7, 0.36);
+        g.add(plate(s, s, [{ r: R + s * 0.01 }], s * 0.014, pm, s * 0.02));
+        g.add(latheZ([[R + s * 0.06, s * 0.012], [R + s * 0.03, s * 0.022], [R + s * 0.012, s * 0.01], [R + s * 0.01, -s * 0.07]], pm));
+        // 가장자리 엠보싱 홈(사각 링) + 모서리 볼트
+        [[0, s * 0.42, s * 0.62, s * 0.03], [0, -s * 0.42, s * 0.62, s * 0.03]].forEach(([x, y, w, h]) => { const b = box(w, h, s * 0.012, pm); b.position.set(x, y, s * 0.012); g.add(b); });
+        [-1, 1].forEach(k => { const b = box(s * 0.03, s * 0.62, s * 0.012, pm); b.position.set(k * s * 0.42, 0, s * 0.012); g.add(b); });
+        [[1, 1], [1, -1], [-1, 1], [-1, -1], [0, 1], [0, -1]].forEach(([a, b]) => { const bo = cyl(s * 0.012, s * 0.012, s * 0.016, FC.galvLight, 8); bo.rotation.x = PI / 2; bo.position.set(a * s * 0.4, b * s * 0.4, s * 0.014); g.add(bo); });
+        rotor = blades({ n: 3, r0: s * 0.06, r1: R * 0.95, w0: s * 0.08, w1: s * 0.3, sweep: s * 0.08, pitch: 0.42, m: FC.alu, hubR: s * 0.05, hubLen: s * 0.05, cap: 0.5 });
+        rotor.position.z = -s * 0.03; g.add(rotor);
+        // U자 브래킷 (위·아래에서 뒤로)
+        const bm = fmat(0xc9ced3, 0.6, 0.4), bz = -s * 0.3;
+        [-1, 1].forEach(k => { const a = box(s * 0.05, s * 0.012, -bz, bm); a.position.set(0, k * s * 0.44, bz / 2); g.add(a); });
+        const v = box(s * 0.05, s * 0.88, s * 0.012, bm); v.position.z = bz; g.add(v);
+        const mot = tubeZ(s * 0.08, s * 0.08, s * 0.12, fmat(0x9aa2aa, 0.6, 0.4), 24, false); mot.position.z = bz + s * 0.07; g.add(mot);
+        for (let i = 0; i < 14; i++) { const a = i / 14 * TAU, f = box(s * 0.012, s * 0.03, s * 0.1, fmat(0x9aa2aa, 0.6, 0.4)); f.position.set(Math.cos(a) * s * 0.09, Math.sin(a) * s * 0.09, bz + s * 0.07); f.rotation.z = a; g.add(f); }
+        const gd = guard(R * 0.98, 5, 4, FC.wire, s * 0.004, s * 0.06); gd.position.z = -s * 0.16; g.add(gd);
+        [PI / 4, -PI / 4].forEach(a => { const w = box(s * 0.006, s * 0.9, s * 0.006, FC.wire); w.rotation.z = a; w.position.z = -s * 0.16; g.add(w); });
+      } else {
+        // 대형 고압팬_축사용팬(쇼룸): 진회색 해머톤 둥근 사각 판, 모서리 X 리브, 스테인리스 4엽(리브), 뒤쪽 가드
+        const ham = fmat(0x55595f, 0.55, 0.62, { env: 0.8 });
+        const pf = propFan(s, { plate: ham, blade: FC.sus, n: 4, w1: s * 0.3, sweep: s * 0.06, pitch: 0.42, motor: FC.graphite });
+        g.add(pf.g); rotor = pf.rot;
+        [PI / 4, 3 * PI / 4, -PI / 4, -3 * PI / 4].forEach(a => { const r = box(s * 0.16, s * 0.02, s * 0.02, ham); r.position.set(Math.cos(a) * s * 0.46, Math.sin(a) * s * 0.46, s * 0.016); r.rotation.z = a; g.add(r); });
+        for (let i = 0; i < 4; i++) { const rib = box(s * 0.02, s * 0.22, s * 0.006, FC.galv); const a = new T.Group(); rib.position.set(-s * 0.04, s * 0.27, s * 0.004); rib.rotation.y = 0.42; a.add(rib); a.rotation.z = i / 4 * TAU; rotor.add(a); }
+      }
+    } else if (kind === 'shutterBox') {
+      // 셔터 / 풍압식 개폐장치: 올리브 도장 사각 틀 + 알루미늄 중력식 루버 (가동 시 열림)
+      const m = fmat(0x76836a, 0.3, 0.5, { env: 0.6 }), d = s * 0.16;
+      g.add(plate(s * 1.12, s * 1.12, [{ w: s * 0.92, h: s * 0.92 }], s * 0.014, m));
+      [[0, s * 0.46, s * 0.92, s * 0.012, d], [0, -s * 0.46, s * 0.92, s * 0.012, d]].forEach(([x, y, w, h, dd]) => { const b = box(w, h, dd, m); b.position.set(x, y, -dd / 2); g.add(b); });
+      [-1, 1].forEach(k => { const b = box(s * 0.012, s * 0.92, d, m); b.position.set(k * s * 0.46, 0, -d / 2); g.add(b); });
+      const sl = new T.Group(); sl.name = 'shutter'; const nS = 6;
+      for (let i = 0; i < nS; i++) {
+        const piv = new T.Group(); piv.position.set(0, s * 0.45 - i * s * 0.9 / nS, s * 0.012);
+        const slat = box(s * 0.9, s * 0.9 / nS * 1.1, s * 0.006, FC.alu); slat.position.y = -s * 0.9 / nS / 2; slat.rotation.x = -0.55; piv.add(slat); sl.add(piv);
+      }
+      g.add(sl);
+      const lab = box(s * 0.12, s * 0.04, s * 0.004, FC.red); lab.position.set(s * 0.32, s * 0.52, s * 0.009); g.add(lab);
+      [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(([a, b]) => { const h = cyl(s * 0.012, s * 0.012, s * 0.016, FC.shade, 8); h.rotation.x = PI / 2; h.position.set(a * s * 0.52, b * s * 0.52, s * 0.008); g.add(h); });
+    } else if (kind === 'controllerBox' || kind === 'controllerPanel') {
+      // 제어기(회색 함, 디지털 표시창·슬라이더·버튼) / 위상 제어기(흰 함, 표시창)
+      const panel = kind === 'controllerPanel', W = s * 0.62, H = s * 0.9, D = s * 0.2;
+      const tex = panelTex((x, w, h) => {
+        x.fillStyle = panel ? '#f2f3f4' : '#c9ced3'; x.fillRect(0, 0, w, h);
+        x.fillStyle = '#e9ecef'; x.fillRect(14, 14, w - 28, h - 28);
+        x.fillStyle = '#20252b'; x.font = 'bold 15px sans-serif'; x.fillText(panel ? '위상 제어기 FFC-8K' : '디지털 환풍 제어기', 26, 40);
+        [[24, 56], [134, 56]].forEach(([px, py]) => { x.fillStyle = '#111'; x.fillRect(px, py, 96, 44); x.fillStyle = '#ff3b30'; x.font = 'bold 30px monospace'; x.fillText(panel ? '50' : '28', px + 22, py + 34); });
+        if (!panel) for (let i = 0; i < 10; i++) { x.fillStyle = '#5b6168'; x.fillRect(40 + i * 18, 150, 6, 50 - i * 2); x.fillStyle = '#20252b'; x.fillRect(36 + i * 18, 186 - i * 3, 14, 6); }
+        for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) { x.fillStyle = r === 0 && c === 3 ? '#d7262b' : '#dfe3e7'; x.beginPath(); x.arc(70 + c * 40, (panel ? 150 : 236) + r * 34, 11, 0, TAU); x.fill(); x.strokeStyle = '#8a9096'; x.stroke(); }
+        x.fillStyle = '#ffffff'; x.fillRect(40, h - 70, w - 80, 40); x.fillStyle = '#1d4fb8'; x.font = 'bold 26px sans-serif'; x.fillText('Fanzic', w / 2 - 44, h - 42);
+      });
+      const side = fmat(panel ? 0xf0f1f2 : 0xc3c8cd, panel ? 0.1 : 0.6, 0.4);
+      const front = new T.MeshStandardMaterial({ map: tex, roughness: 0.5, metalness: 0.1 });
+      const bx = new T.Mesh(new T.BoxGeometry(W, H, D), [side, side, side, side, front, side]); g.add(bx);
+      [-1, 1].forEach(k => { const r = box(s * 0.02, H * 1.02, D * 1.04, side); r.position.x = k * (W / 2 + s * 0.005); g.add(r); });
+      const cab = cyl(s * 0.02, s * 0.02, s * 0.06, FC.black, 10); cab.position.set(W * 0.3, -H / 2 - s * 0.03, 0); g.add(cab);
+    } else if (kind === 'boxMesh' || kind === 'sleeveGuard') {
+      // 주차장팬(쇼룸 철망 박스): 아연도 상자 + 앞면 확장 철망 문 2짝·가운데 기둥 + 안쪽 큰 날개 / 슬리브·가드박스: 깊은 슬리브 틀 + 철망 가드
+      const guardOnly = kind === 'sleeveGuard', W = s, H = s * 1.02, D = guardOnly ? s * 0.32 : s * 0.5, t = s * 0.015, gm = FC.galv;
+      [-1, 1].forEach(k => { const p = box(W, t, D, gm); p.position.set(0, k * H / 2, -D / 2); g.add(p); const q = box(t, H, D, gm); q.position.set(k * W / 2, 0, -D / 2); g.add(q); });
+      g.add(squareFrame(W + t, W * 0.94, s * 0.03, gm));
+      const mp = meshPanel(W * 0.92, H * 0.92, guardOnly ? 'perf' : 'diamond', 0xc9cfd5, 9); mp.position.z = s * 0.012; g.add(mp);
+      if (!guardOnly) {
+        const post = box(s * 0.05, H * 0.94, s * 0.02, gm); post.position.z = s * 0.02; g.add(post);
+        [-1, 1].forEach(k => { const f = box(s * 0.02, H * 0.92, s * 0.02, gm); f.position.set(k * W * 0.46, 0, s * 0.02); g.add(f); });
+        const warn = box(s * 0.035, s * 0.22, s * 0.004, FC.yellow); warn.position.set(0, s * 0.1, s * 0.031); g.add(warn);
+        const part = plate(W, H, [{ r: s * 0.46 }], t, gm); part.position.z = -D * 0.55; g.add(part);
+        g.add(latheZ([[s * 0.46, -D * 0.55], [s * 0.455, -D * 0.7], [s * 0.455, -D * 0.85]], gm));
+        rotor = blades({ n: 4, r0: s * 0.07, r1: s * 0.44, w0: s * 0.08, w1: s * 0.26, sweep: s * 0.1, pitch: 0.45, m: FC.sus, hubR: s * 0.07, hubLen: s * 0.06, cap: 0.5 });
+        rotor.position.z = -D * 0.62; g.add(rotor);
+        const mot = tubeZ(s * 0.08, s * 0.08, s * 0.16, FC.graphite, 24, false); mot.position.z = -D * 0.9; g.add(mot);
+        const jb = box(s * 0.04, s * 0.14, s * 0.12, gm); jb.position.set(W / 2 + s * 0.02, s * 0.3, -D * 0.3); g.add(jb);
+        const back = guard(s * 0.45, 6, 8, FC.wire, s * 0.003); back.position.z = -D; g.add(back);
+      } else {
+        const rail = box(W * 1.06, s * 0.05, s * 0.2, gm); rail.position.set(0, -H / 2 - s * 0.03, -D - s * 0.1); g.add(rail);
+        [-1, 1].forEach(k => { const p = box(s * 0.05, H, s * 0.2, gm); p.position.set(k * (W / 2 + s * 0.03), 0, -D - s * 0.1); g.add(p); });
+        const top = box(W * 1.06, s * 0.05, s * 0.2, gm); top.position.set(0, H / 2 + s * 0.03, -D - s * 0.1); g.add(top);
+      }
+    } else if (kind === 'vaneAxial') {
+      // 덕트팬(쇼룸 베인 축류): 연회녹 원통 + 양끝 볼트 플랜지, 앞쪽 검정 나선 가드 + 빨간 팬직 배지, 5엽, 위 L브래킷 2개, 아래 검정 받침
+      const m = fmat(0xc4ccc4, 0.25, 0.4, { env: 0.75 }), r = s * 0.5, L = s * 0.72;
+      g.add(tubeZ(r, r, L, m, 56));
+      [-1, 1].forEach(k => {
+        const fl = new T.Mesh(new T.RingGeometry(r, r + s * 0.07, 56), m); fl.position.z = k * L / 2; g.add(fl);
+        g.add(torusZ(r + s * 0.07, s * 0.008, m, k * L / 2));
+        for (let i = 0; i < 8; i++) { const a = i / 8 * TAU + 0.2, h = discZ(s * 0.012, FC.shade, k * L / 2 + k * 0.001); h.position.x = Math.cos(a) * (r + s * 0.04); h.position.y = Math.sin(a) * (r + s * 0.04); if (k < 0) h.rotation.y = PI; g.add(h); }
+      });
+      const gd = guard(r * 0.98, 13, 8, FC.black, s * 0.0045, r * 0.16); gd.position.z = L / 2 + s * 0.03; g.add(gd);
+      const badge = discZ(r * 0.15, FC.red, L / 2 + s * 0.036); g.add(badge);
+      const bring = new T.Mesh(new T.RingGeometry(r * 0.15, r * 0.19, 32), FC.black); bring.position.z = L / 2 + s * 0.035; g.add(bring);
+      rotor = blades({ n: 5, r0: s * 0.12, r1: r * 0.94, w0: s * 0.14, w1: s * 0.26, sweep: s * 0.06, pitch: 0.5, m: FC.graphite, hubR: s * 0.13, hubLen: s * 0.1, hubMat: FC.graphite });
+      rotor.position.z = L * 0.15; g.add(rotor);
+      const mot = tubeZ(s * 0.16, s * 0.16, L * 0.45, FC.graphite, 28, false); mot.position.z = -L * 0.1; g.add(mot);
+      [-1, 1].forEach(k => { const lb = box(s * 0.09, s * 0.012, s * 0.08, FC.graphite); lb.position.set(0, r + s * 0.08, k * L * 0.2); g.add(lb); const lv = box(s * 0.09, s * 0.08, s * 0.012, FC.graphite); lv.position.set(0, r + s * 0.04, k * L * 0.2 - s * 0.04); g.add(lv); });
+      const base = box(s * 0.5, s * 0.12, L * 0.6, FC.black); base.position.y = -r - s * 0.05; g.add(base);
+    } else if (kind === 'portableDrum') {
+      // 포터블팬 TFT-20(쇼룸): 노란 원통 + 위쪽 검정 손잡이 + 앞뒤 나선 가드 + 아래 노란 U자 다리 2개
+      const ym = fmat(0xf2c200, 0.3, 0.32, { env: 0.8 }), r = s * 0.5, L = s * 1.25;
+      g.add(tubeZ(r, r, L, ym, 48));
+      [-1, 1].forEach(k => g.add(torusZ(r, s * 0.025, ym, k * L / 2)));
+      [-1, 1].forEach(k => { const gd = guard(r * 0.93, 8, 6, FC.sus, s * 0.006, r * 0.14); gd.position.z = k * (L / 2 - s * 0.04); g.add(gd); });
+      const badge = box(r * 0.55, r * 0.16, s * 0.01, FC.galvLight); badge.position.z = L / 2 - s * 0.03; g.add(badge);
+      rotor = blades({ n: 5, r0: s * 0.12, r1: r * 0.9, w0: s * 0.12, w1: s * 0.32, sweep: s * 0.1, pitch: 0.5, m: FC.alu, hubR: s * 0.12, hubLen: s * 0.1, cap: 0.4 });
+      rotor.position.z = L * 0.12; g.add(rotor);
+      const mot = tubeZ(s * 0.18, s * 0.18, L * 0.35, FC.graphite, 24, false); mot.position.z = -L * 0.12; g.add(mot);
+      // 손잡이: 두 받침 + 휘어진 손잡이 봉
+      [-1, 1].forEach(k => { const b = box(s * 0.12, s * 0.09, s * 0.16, FC.black); b.position.set(0, r + s * 0.03, k * L * 0.3); g.add(b); });
+      const hc = new T.CatmullRomCurve3([new T.Vector3(0, r + s * 0.07, -L * 0.3), new T.Vector3(0, r + s * 0.17, -L * 0.22), new T.Vector3(0, r + s * 0.18, L * 0.22), new T.Vector3(0, r + s * 0.07, L * 0.3)]);
+      g.add(new T.Mesh(new T.TubeGeometry(hc, 24, s * 0.035, 10, false), FC.black));
+      const sw = box(s * 0.04, s * 0.05, s * 0.03, FC.sus); sw.position.set(0, r + s * 0.08, L * 0.12); g.add(sw);
+      // 옆 라벨
+      const lab = box(s * 0.006, s * 0.42, s * 0.5, FC.white); lab.position.set(r + s * 0.002, 0, -s * 0.05); lab.rotation.z = 0; g.add(lab);
+      const lr = box(s * 0.007, s * 0.1, s * 0.5, FC.red); lr.position.set(r + s * 0.004, s * 0.16, -s * 0.05); g.add(lr);
+      // U자 다리
+      [-1, 1].forEach(k => {
+        const c = new T.CatmullRomCurve3([new T.Vector3(-r * 0.75, -r * 0.6, k * L * 0.27), new T.Vector3(-r * 0.62, -r - s * 0.18, k * L * 0.3), new T.Vector3(0, -r - s * 0.22, k * L * 0.31), new T.Vector3(r * 0.62, -r - s * 0.18, k * L * 0.3), new T.Vector3(r * 0.75, -r * 0.6, k * L * 0.27)]);
+        g.add(new T.Mesh(new T.TubeGeometry(c, 24, s * 0.035, 8, false), ym));
+      });
+    } else if (kind === 'ceilventRing' || kind === 'ceilventPlain') {
+      // 실링팬 2(동심원 루버 그릴) / 플라스틱팬(매끈한 흰 판): 천장 사각 패널 + 검정 원형 덕트 접속구
+      axis = 'y';
+      const ring = kind === 'ceilventRing';
+      const pan = new T.Mesh(new T.CylinderGeometry(s * 0.707, s * 0.69, s * 0.04, 4, 1), FC.white); pan.rotation.y = PI / 4; pan.position.y = -s * 0.02; g.add(pan);
+      if (ring) {
+        for (let i = 0; i < 4; i++) { const rr = s * (0.12 + i * 0.075); const t = new T.Mesh(new T.TorusGeometry(rr, s * 0.012, 6, 48), FC.white); t.rotation.x = PI / 2; t.position.y = -s * 0.05 - (3 - i) * s * 0.006; g.add(t); }
+        const gap = cyl(s * 0.4, s * 0.4, s * 0.004, fmat(0xc9cdd1, 0.05, 0.6, { env: 0.3 }), 48); gap.position.y = -s * 0.041; g.add(gap);
+        const cap = cyl(s * 0.09, s * 0.09, s * 0.02, FC.white, 32); cap.position.y = -s * 0.07; g.add(cap);
+      } else {
+        const bulge = new T.Mesh(new T.CylinderGeometry(s * 0.69, s * 0.6, s * 0.02, 4, 1), FC.white); bulge.rotation.y = PI / 4; bulge.position.y = -s * 0.05; g.add(bulge);
+        const led = cyl(s * 0.008, s * 0.008, s * 0.004, new T.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x38bdf8, emissiveIntensity: 1 }), 12); led.position.set(-s * 0.3, -s * 0.062, s * 0.3); g.add(led);
+      }
+      const housing = box(s * 0.68, s * 0.22, s * 0.68, FC.galvLight); housing.position.y = s * 0.11; g.add(housing);
+      const col = cyl(s * 0.17, s * 0.17, s * 0.22, FC.black, 32, true); col.rotation.z = PI / 2; col.position.set(s * 0.44, s * 0.12, 0); g.add(col);
+      rotor = new T.Group(); for (let i = 0; i < 6; i++) { const b = box(s * 0.22, 0.01, s * 0.06, MAT.bladeDark); b.position.x = s * 0.12; const a = new T.Group(); a.add(b); a.rotation.y = i / 6 * TAU; rotor.add(a); }
+      rotor.position.y = s * 0.1; g.add(rotor);
+    } else if (kind === 'plasticWall') {
+      // 플라스틱 환풍기: 흰 사각 틀 + 둥근 개구부의 휘어진 고정 그릴(실내 쪽 -z) + 뒤쪽 날개
+      const m = FC.white, r = s * 0.36;
+      const fr = plate(s, s, [{ r }], s * 0.05, m, s * 0.04); fr.position.z = -s * 0.03; g.add(fr);
+      for (let i = 0; i < 14; i++) { const a = i / 14 * TAU, v = box(s * 0.012, r * 0.82, s * 0.04, m); const ag = new T.Group(); v.position.y = r * 0.5; v.rotation.z = 0.5; ag.add(v); ag.rotation.z = a; ag.position.z = -s * 0.05; g.add(ag); }
+      g.add(torusZ(r * 0.95, s * 0.012, m, -s * 0.05)); g.add(torusZ(r * 0.18, s * 0.02, m, -s * 0.05));
+      const hub = discZ(r * 0.18, m, -s * 0.058); hub.rotation.y = PI; g.add(hub);
+      const logo = box(s * 0.12, s * 0.03, s * 0.004, FC.shade); logo.position.set(s * 0.28, -s * 0.42, -s * 0.057); g.add(logo);
+      g.add(tubeZ(r * 1.02, r * 1.02, s * 0.2, FC.white, 40)); g.children[g.children.length - 1].position.z = s * 0.08;
+      rotor = blades({ n: 5, r0: s * 0.06, r1: r * 0.95, w0: s * 0.08, w1: s * 0.16, sweep: s * 0.05, pitch: 0.5, m: FC.pipeBlade, hubR: s * 0.07, hubLen: s * 0.06, hubMat: FC.white });
+      rotor.position.z = s * 0.03; g.add(rotor);
+    } else if (kind === 'aspirator') {
+      // 흡출기 TFC-F17(쇼룸): 아연도 배관 + 플랜지 링 + 띠 프레임 안 원심 임펠러 + 위쪽 루버 돌기가 있는 둥근 후드
+      axis = 'y';
+      const m = fmat(0xcfd4d9, 0.75, 0.36), r = s * 0.42;
+      const pipe = cyl(s * 0.25, s * 0.25, s * 0.34, m, 40); pipe.position.y = s * 0.17; g.add(pipe);
+      const fl = cyl(r * 1.08, r * 1.08, s * 0.02, m, 48); fl.position.y = s * 0.34; g.add(fl);
+      const top = cyl(r * 1.1, r * 1.1, s * 0.05, m, 48); top.position.y = s * 0.66; g.add(top);
+      for (let i = 0; i < 6; i++) { const a = i / 6 * TAU, st = box(s * 0.07, s * 0.3, s * 0.012, m); st.position.set(Math.cos(a) * r * 1.05, s * 0.5, Math.sin(a) * r * 1.05); st.rotation.y = -a + PI / 2; g.add(st); }
+      rotor = new T.Group();
+      for (let i = 0; i < 10; i++) { const a = i / 10 * TAU, b = box(s * 0.2, s * 0.2, s * 0.01, FC.sus); b.position.set(Math.cos(a) * r * 0.55, 0, Math.sin(a) * r * 0.55); b.rotation.y = -a + 0.6; rotor.add(b); }
+      const disc = cyl(r * 0.8, r * 0.8, s * 0.01, FC.sus, 40); disc.position.y = s * 0.1; rotor.add(disc);
+      rotor.position.y = s * 0.5; g.add(rotor);
+      const hood = cyl(r * 0.95, r, s * 0.42, m, 48); hood.position.y = s * 0.9; g.add(hood);
+      const dome = new T.Mesh(new T.SphereGeometry(r * 0.95, 32, 8, 0, TAU, 0, PI * 0.18), m); dome.scale.y = 0.6; dome.position.y = s * 1.05; g.add(dome);
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) { const a = i / 4 * TAU + 0.4, lv = box(s * 0.24, s * 0.04, s * 0.05, m); lv.position.set(Math.cos(a) * r * 0.98, s * 0.78 + j * s * 0.09, Math.sin(a) * r * 0.98); lv.rotation.y = -a + PI / 2; g.add(lv); }
+    } else if (kind === 'roofEC') {
+      // 루프팬 EC(TFR): 사각 받침 플랜지 + 경사진 몸체 + 윗면 격자 그릴 + 옆 제어함 (토출 = 위)
+      axis = 'y';
+      const m = fmat(0xe7eaed, 0.45, 0.38), W = s * 1.2;
+      const base = box(W * 1.1, s * 0.03, W * 1.1, m); base.position.y = s * 0.015; g.add(base);
+      const body = new T.Mesh(new T.CylinderGeometry(W * 0.64, W * 0.76, s * 0.45, 4, 1), m); body.rotation.y = PI / 4; body.position.y = s * 0.255; g.add(body);
+      const rim = box(W * 0.92, s * 0.05, W * 0.92, m); rim.position.y = s * 0.5; g.add(rim);
+      const gr = grid(W * 0.8, W * 0.8, 16, 16, FC.galv, s * 0.012); gr.rotation.x = -PI / 2; gr.position.y = s * 0.53; g.add(gr);
+      const sh = box(W * 0.8, s * 0.004, W * 0.8, FC.shade); sh.position.y = s * 0.42; g.add(sh);
+      rotor = new T.Group(); for (let i = 0; i < 7; i++) { const b = box(s * 0.3, s * 0.06, s * 0.01, FC.alu); b.position.x = s * 0.18; const a = new T.Group(); a.add(b); a.rotation.y = i / 7 * TAU; rotor.add(a); }
+      rotor.position.y = s * 0.46; g.add(rotor);
+      const cb = box(s * 0.26, s * 0.16, s * 0.06, m); cb.position.set(-W * 0.2, s * 0.2, W * 0.45); cb.rotation.x = -0.35; g.add(cb);
+      const disp = box(s * 0.12, s * 0.05, s * 0.01, FC.black); disp.position.set(-W * 0.22, s * 0.22, W * 0.48); disp.rotation.x = -0.35; g.add(disp);
+      const lab = box(s * 0.18, s * 0.04, s * 0.01, FC.blue); lab.position.set(W * 0.25, s * 0.16, W * 0.5); lab.rotation.x = -0.35; g.add(lab);
+    } else if (kind === 'hangerBox') {
+      // 행거팬(TFN): 아연도 사각 케이스, 앞면(+z) 두 토출구 안 양흡 드럼, 위 행거 탭 4개, 옆 모터·벨트 커버
+      const W = s, H = s * 0.42, D = s * 0.75, t = s * 0.012, m = FC.galv;
+      [-1, 1].forEach(k => { const p = box(W, t, D, m); p.position.y = k * H / 2; g.add(p); const q = box(t, H, D, m); q.position.x = k * W / 2; g.add(q); });
+      g.add(edgeFrame(W, H, D, s * 0.02, m));
+      const ow = W * 0.36, oh = H * 0.62, holes = [{ x: -W * 0.22, y: s * 0.02, w: ow, h: oh }, { x: W * 0.22, y: s * 0.02, w: ow, h: oh }];
+      const fp = plate(W, H, holes, t, m); fp.position.z = D / 2; g.add(fp);
+      const bp = box(W, H, t, m); bp.position.z = -D / 2; g.add(bp);
+      const inner = box(W * 0.96, H * 0.9, t, FC.shade); inner.position.z = -D / 2 + s * 0.02; g.add(inner);
+      const holderA = new T.Group(); holderA.rotation.y = -PI / 2; holderA.position.set(0, -s * 0.01, s * 0.05); g.add(holderA);
+      const imp = new T.Group(); holderA.add(imp);
+      [-1, 1].forEach(k => { const d = sirocoDrum(H * 0.3, ow * 0.9, 32, FC.galvLight, FC.galv, FC.shade); d.position.z = -k * W * 0.22; imp.add(d); });
+      rotor = spinLink(imp, 'z');
+      holes.forEach(q => { [-1, 1].forEach(k => { const b = box(q.w + s * 0.03, s * 0.02, s * 0.04, m); b.position.set(q.x, q.y + k * q.h / 2, D / 2 + s * 0.02); g.add(b); const c = box(s * 0.02, q.h, s * 0.04, m); c.position.set(q.x + k * q.w / 2, q.y, D / 2 + s * 0.02); g.add(c); }); });
+      [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(([a, b]) => { const tab = box(s * 0.08, s * 0.06, s * 0.012, m); tab.position.set(a * (W / 2 - s * 0.06), H / 2 + s * 0.03, b * (D / 2 - s * 0.06)); g.add(tab); const rod = cyl(s * 0.008, s * 0.008, s * 0.12, FC.wire, 6); rod.position.set(a * (W / 2 - s * 0.06), H / 2 + s * 0.09, b * (D / 2 - s * 0.06)); g.add(rod); });
+      const jb = box(s * 0.03, s * 0.1, s * 0.12, FC.galvLight); jb.position.set(W / 2 + s * 0.02, 0, -D * 0.2); g.add(jb);
+      [-1, 1].forEach(k => { const fb = box(s * 0.06, s * 0.03, s * 0.12, m); fb.position.set(k * (W / 2 + s * 0.03), -H / 2 + s * 0.02, D / 2 - s * 0.08); g.add(fb); });
+    } else if (kind === 'standFan') {
+      // 산업용 선풍기 TFE-F45: 주황 날개 + 흰 철망 가드(앞뒤) + 주황 배지 + 흰 모터 + 기둥·삼각 받침
+      const r = s * 0.5, wm = FC.white;
+      const gF = guard(r, 9, 18, wm, s * 0.004, r * 0.12); gF.position.z = s * 0.1; g.add(gF);
+      const gB = guard(r, 7, 18, wm, s * 0.004, r * 0.2); gB.position.z = -s * 0.08; g.add(gB);
+      g.add(torusZ(r, s * 0.012, wm, s * 0.01));
+      const badge = discZ(r * 0.14, FC.orange, s * 0.104); g.add(badge);
+      rotor = blades({ n: 4, r0: s * 0.06, r1: r * 0.92, w0: s * 0.1, w1: s * 0.36, sweep: s * 0.08, pitch: 0.38, m: FC.orange, hubR: s * 0.07, hubLen: s * 0.05, hubMat: FC.orange });
+      rotor.position.z = s * 0.02; g.add(rotor);
+      const mot = tubeZ(s * 0.13, s * 0.15, s * 0.26, wm, 28, false); mot.position.z = -s * 0.22; g.add(mot);
+      const pole = cyl(s * 0.03, s * 0.03, s * 1.6, wm, 12); pole.position.set(0, -s * 0.85, -s * 0.2); g.add(pole);
+      for (let i = 0; i < 3; i++) { const a = i / 3 * TAU + PI / 2; g.add(tubeBetween(new T.Vector3(0, -s * 1.3, -s * 0.2), new T.Vector3(Math.cos(a) * s * 0.55, -s * 1.65, -s * 0.2 + Math.sin(a) * s * 0.55), s * 0.025, wm)); }
+    } else if (kind === 'hvlsBldc') {
+      // BLDC 대형실링팬: 흰 다운로드 + 와이어 고정 + 납작한 원반 모터(방열 리브) + 6날개
+      axis = 'y';
+      const R = s / 2;
+      const top = box(0.36, 0.04, 0.36, FC.galvLight); top.position.y = 1.78; g.add(top);
+      const rod = box(0.12, 1.4, 0.12, FC.white); rod.position.y = 1.06; g.add(rod);
+      for (let i = 0; i < 4; i++) { const a = i / 4 * TAU + PI / 4; g.add(tubeBetween(new T.Vector3(0, 0.55, 0), new T.Vector3(Math.cos(a) * 0.9, 1.75, Math.sin(a) * 0.9), 0.008, FC.wire)); }
+      const yoke = box(0.2, 0.2, 0.2, FC.galv); yoke.position.y = 0.4; g.add(yoke);
+      rotor = new T.Group();
+      const disc = cyl(0.56, 0.56, 0.28, FC.galv, 56); rotor.add(disc);
+      for (let i = 0; i < 9; i++) { const rib = new T.Mesh(new T.TorusGeometry(0.565, 0.01, 4, 56), FC.galvLight); rib.rotation.x = PI / 2; rib.position.y = -0.11 + i * 0.026; rotor.add(rib); }
+      const bot = cyl(0.48, 0.54, 0.05, FC.white, 56); bot.position.y = -0.16; rotor.add(bot);
+      const red = cyl(0.08, 0.08, 0.01, FC.red, 16); red.position.y = -0.19; rotor.add(red);
+      for (let i = 0; i < 6; i++) {
+        const arm = new T.Group(), L = R - 0.35;
+        const b = box(L, 0.035, 0.22, MAT.hvlsBlade); b.position.x = 0.35 + L / 2; b.rotation.x = 0.1; arm.add(b);
+        const clamp = box(0.3, 0.06, 0.12, FC.galvLight); clamp.position.x = 0.42; arm.add(clamp);
+        arm.rotation.y = (i / 6) * TAU; rotor.add(arm);
+      }
+      rotor.position.y = 0.15; g.add(rotor);
+    } else if (kind === 'diffuserSq') {
+      // 사각 디퓨져: 흰 사각 판 + 동심 사각 루버 (천장, 면이 아래)
+      axis = 'y';
+      for (let i = 0; i < 4; i++) { const w = s * (1 - i * 0.2); const fr = squareFrame(w, w - s * 0.06, s * 0.025, FC.white); fr.rotation.x = PI / 2; fr.position.y = -s * 0.02 - i * s * 0.012; g.add(fr); }
+      const c = box(s * 0.32, s * 0.02, s * 0.32, FC.white); c.position.y = -s * 0.07; g.add(c);
+      const back = box(s * 0.96, s * 0.004, s * 0.96, fmat(0xc9cdd1, 0.05, 0.6, { env: 0.3 })); back.position.y = -s * 0.004; g.add(back);
+      const neck = cyl(s * 0.25, s * 0.25, s * 0.15, FC.galvLight, 32, true); neck.position.y = s * 0.08; g.add(neck);
+      rotor = new T.Group();
     }
     g.traverse(o => { if (o.isMesh) { o.castShadow = true; } });
     return { group: g, rotor, axis };
@@ -1091,7 +1401,7 @@ window.FZ = window.FZ || {};
     const v = (x, y, z) => new T.Vector3(x, y, z);
     const used = {}; // 같은 배치 방식을 쓰는 제품끼리 이어서 배치
     items.forEach(it => {
-      const p = FZ.PRODUCTS[it.id];
+      const p = FZ.eff(it.id);
       const n = it.n, s = p.size, lane = it.lane || 0;
       if (!n) return;
       const push = (pos, dir, flow, mount) => out.push({ id: it.id, p, kind: p.model3d, pos, dir: dir.normalize(), flow, mount, mode: it.mode });

@@ -212,7 +212,7 @@ window.FZ = window.FZ || {};
       g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.userData.siteId = id; } });
       s.add(g);
       // 대표 팬 미니 아이콘 (회전)
-      const p = FZ.PRODUCTS[site.products[0].id];
+      const p = FZ.eff(site.products[0].id);
       const fan = FZ.models.fan(p.model3d === 'defroster' ? 'propeller' : p.model3d, 1);
       const holder = new T.Group(); holder.add(fan.group);
       const topY = (site.dims.H + FZ.models.roofRise(site) + (site.roof === 'under' ? 1 : 0)) * sc + 0.3;

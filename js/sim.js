@@ -16,7 +16,7 @@ window.FZ = window.FZ || {};
   function unitFlow(p) { return p.airflow * (p.eff || 1); }
 
   function recommend(site, item) {
-    const p = P()[item.id];
+    const p = FZ.eff(item.id);
     const g = geom(site);
     const s = item.sizing || { type: 'fixed', n: 1 };
     const fq = unitFlow(p) || 1;
@@ -74,7 +74,7 @@ window.FZ = window.FZ || {};
   function compute(site, qty, prm) {
     const g = geom(site);
     const c = site.cond;
-    const items = site.products.map(it => ({ ...it, p: P()[it.id], n: qty[it.id] ?? recommend(site, it) }));
+    const items = site.products.map(it => ({ ...it, p: FZ.eff(it.id), n: qty[it.id] ?? recommend(site, it) }));
 
     // 환기량
     const Q0 = c.q0 != null ? c.q0 : (c.ach0 || 0) * g.V;

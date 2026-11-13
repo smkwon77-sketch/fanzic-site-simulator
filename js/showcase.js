@@ -9,10 +9,10 @@ window.FZ = window.FZ || {};
   /* ---------- 썸네일 (사진 대신) ---------- */
   let thumbR = null;
   const thumbCache = {};
-  const THUMB_YAW = { inline: Math.PI - 0.6, squareInline: Math.PI - 0.6, ec: Math.PI - 0.6, cabinet: Math.PI - 0.6, cabinetMulti: Math.PI, centrifugal: -1.35, centrifugalSus: -0.05, sirocoDouble: -0.5, jet: -1.0, circ: -0.25, defroster: -0.3, belt: -0.5, propeller: -0.3 };
+  const THUMB_YAW = { inline: Math.PI - 0.6, squareInline: Math.PI - 0.6, ec: Math.PI - 0.6, cabinet: Math.PI - 0.6, cabinetMulti: Math.PI, centrifugal: -1.35, centrifugalSus: -0.05, sirocoDouble: -0.5, jet: -1.0, circ: -0.25, defroster: -0.3, belt: -0.5, propeller: -0.3, sirocoBox: -0.3, sirocoFrame: -0.05, plasticWall: Math.PI, propSmall: Math.PI - 0.3, vaneAxial: -0.3, portableDrum: 0.9, boxMesh: -0.3, hangerBox: -0.4, standFan: -0.2, controllerBox: -0.3, controllerPanel: -0.3, shutterBox: -0.4 };
   SC.thumb = function (pid) {
-    if (thumbCache[pid]) return thumbCache[pid];
-    const p = FZ.PRODUCTS[pid];
+    const p = FZ.eff(pid), key = pid + '|' + p.model3d; // 모델에 따라 3D 종류가 바뀜
+    if (thumbCache[key]) return thumbCache[key];
     if (!thumbR) {
       const c = document.createElement('canvas'); c.width = 320; c.height = 240;
       thumbR = new T.WebGLRenderer({ canvas: c, antialias: true, preserveDrawingBuffer: true, alpha: true });
@@ -32,7 +32,7 @@ window.FZ = window.FZ || {};
     const cam = new T.PerspectiveCamera(32, 4 / 3, 0.01, 100);
     cam.position.set(r * 1.1, r * 0.75, r * 1.9); cam.lookAt(0, 0, 0);
     thumbR.render(scene, cam);
-    return (thumbCache[pid] = thumbR.domElement.toDataURL('image/png'));
+    return (thumbCache[key] = thumbR.domElement.toDataURL('image/png'));
   };
   SC.imageOf = function (pid) {
     const t = FZ.TAGS[pid];
@@ -52,19 +52,19 @@ window.FZ = window.FZ || {};
 
   // mode: exhaust | intake | circ
   SC.build = function (pid, mode) {
-    const p = FZ.PRODUCTS[pid];
+    const p = FZ.eff(pid), HV = /^hvls/.test(p.model3d);
     const scene = new T.Scene();
     scene.background = new T.Color(BG);
     FZ.engine.lights(scene, 8);
     const ground = new T.Mesh(new T.CircleGeometry(6, 48), new T.MeshStandardMaterial({ color: 0xe3e8ee, roughness: 1 }));
     ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
     const f = FZ.models.fan(p.model3d, p.size);
-    const k = p.model3d === 'hvls' ? 3.2 / p.size : 1.6 / Math.max(0.4, p.size);
+    const k = HV ? 3.2 / p.size : 1.6 / Math.max(0.4, p.size);
     const holder = new T.Group(); holder.add(f.group); holder.scale.setScalar(k);
     const vertical = f.axis === 'y';
     // 공기 흐름 방향: 가로형은 +x(실내 → 실외), 세로형은 위/아래
     let flow;
-    if (p.model3d === 'hvls') { holder.position.y = 2.6; flow = new T.Vector3(0, -1, 0); }
+    if (HV) { holder.position.y = 2.6; flow = new T.Vector3(0, -1, 0); }
     else if (vertical) { holder.position.y = 1.2; flow = new T.Vector3(0, mode === 'intake' ? -1 : 1, 0); }
     else {
       holder.rotation.y = Math.PI / 2; holder.position.y = 1.2;
@@ -86,20 +86,20 @@ window.FZ = window.FZ || {};
     const pts = new T.Points(geo, new T.PointsMaterial({ size: 0.11, vertexColors: true, transparent: true, depthWrite: false }));
     pts.frustumCulled = false; scene.add(pts);
     const center = holder.position.clone();
-    const rad = p.model3d === 'hvls' ? 3 : Math.min(0.75, 0.42 * k * p.size);
+    const rad = HV ? 3 : Math.min(0.75, 0.42 * k * p.size);
     const C_IN = mode === 'intake' ? [2, 132, 199] : [234, 88, 12], C_OUT = mode === 'intake' ? [2, 132, 199] : [190, 120, 80], C_CIRC = [56, 160, 220];
     const BGc = [241, 244, 248];
     let spin = 0;
     function tick(dt, time, on) {
       spin += ((on ? 1 : 0) - spin) * Math.min(1, dt * 2);
-      if (f.rotor) { const r = (p.model3d === 'hvls' ? 1.4 : 10) * spin * dt * (mode === 'intake' ? -1 : 1); if (f.axis === 'y') f.rotor.rotation.y += r; else f.rotor.rotation.z += r; }
+      if (f.rotor) { const r = (HV ? 1.4 : 10) * spin * dt * (mode === 'intake' ? -1 : 1); if (f.axis === 'y') f.rotor.rotation.y += r; else f.rotor.rotation.z += r; }
       const sh = f.group.getObjectByName('shutter'); if (sh) sh.children.forEach(pv => { pv.rotation.x = -1.25 * spin; });
       for (let i = 0; i < N; i++) {
         tt[i] += dt * 0.35 * (0.6 + spin);
         if (tt[i] > 1) tt[i] -= 1;
         const s = tt[i] * 2 - 1; // -1 → 1 (팬 앞뒤)
         let x, y, z;
-        if (p.model3d === 'hvls') {
+        if (HV) {
           // 아래로 내려온 뒤 바닥을 따라 퍼짐
           const a = off[i * 2] * Math.PI * 2, r0 = Math.abs(off[i * 2 + 1]) * rad;
           if (s < 0.2) { x = Math.cos(a) * r0; z = Math.sin(a) * r0; y = center.y - (s + 1) / 1.2 * (center.y - 0.25); }
@@ -118,7 +118,7 @@ window.FZ = window.FZ || {};
       }
       geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true;
     }
-    return { scene, tick, target: new T.Vector3(0, p.model3d === 'hvls' ? 1.6 : 1.2, 0), radius: p.model3d === 'hvls' ? 14 : 9.5 };
+    return { scene, tick, target: new T.Vector3(0, HV ? 1.6 : 1.2, 0), radius: HV ? 14 : 9.5 };
   };
 
   FZ.showcase = SC;

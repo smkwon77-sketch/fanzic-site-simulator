@@ -2,7 +2,9 @@
    view: home | env(환경에서 찾기) | product(제품에서 찾기)
    env 단계: cond(환경 설정) → pick(제품 선택) → install → effect → summary */
 (function () {
-  const T = THREE, E = FZ.engine, P = FZ.PRODUCTS, I = FZ.install, X = FZ.fx, R = FZ.recommend, SC = FZ.showcase;
+  // P[id] = 선택 사양(모델·주파수)이 반영된 제품 정보
+  const P = new Proxy(FZ.PRODUCTS, { get: (t, k) => (typeof k === 'string' && t[k]) ? FZ.eff(k) : t[k] });
+  const T = THREE, E = FZ.engine, I = FZ.install, X = FZ.fx, R = FZ.recommend, SC = FZ.showcase;
   const $ = id => document.getElementById(id);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const fmt = (v, d = 0) => (v == null || isNaN(v)) ? '–' : Number(v).toLocaleString('ko-KR', { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -80,11 +82,17 @@
     $('logo').src = FZ.LOGO; $('homeLogo').src = FZ.LOGO;
     E.init($('gl'));
     E.frameFns.push(tick);
-    $('stripEnv').innerHTML = ['prop_belt', 'double_sirocco', 'hvls_bldc', 'purigen'].map(id => `<img src="assets/products/${FZ.TAGS[id].image}" alt="">`).join('');
+    $('stripEnv').innerHTML = ['prop_belt', 'double_sirocco', 'hvls', 'purigen'].map(id => `<img src="assets/products/${FZ.TAGS[id].image}" alt="">`).join('');
     $('stripProd').innerHTML = ['sirocco_sus.jpg', 'duct_square.jpg', 'propeller.jpg', 'hoodcap.jpg'].map(f => `<img src="assets/products/${f}" alt="">`).join('');
     document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
     document.querySelectorAll('.modes [data-mode]').forEach(b => b.addEventListener('click', () => go(b.dataset.mode)));
     $('logo').addEventListener('click', () => { $('home').hidden = false; setModeButtons(null); });
+    document.querySelectorAll('[data-hz]').forEach(b => b.addEventListener('click', () => {
+      FZ.SEL.hz = +b.dataset.hz;
+      document.querySelectorAll('[data-hz]').forEach(x => x.setAttribute('aria-pressed', +x.dataset.hz === FZ.SEL.hz));
+      if (st.view === 'env') { applySel(); renderLeft(); renderRight(); renderHud(); }
+      else if (st.view === 'product') renderProductDetail(true);
+    }));
   }
   function setModeButtons(m) { document.querySelectorAll('.modes [data-mode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === m)); }
   function go(mode) {
@@ -108,16 +116,36 @@
     st.site = FZ.env.build(st.cond);
     st.rec = R.set(st.cond);
     if (preset) { st.sel = preset.sel; st.dir = preset.dir || {}; }
-    else { st.sel = st.rec.map(x => x.id); st.dir = {}; }
+    else { st.sel = st.rec.map(x => x.id); st.dir = {}; FZ.SEL.manual = {}; }
     st.sel.forEach(id => { if (!st.dir[id]) st.dir[id] = tag(id).def; });
     applySel(false);
     disposeSite(); buildSite();
   }
   function applySel(rebuild = true) {
     st.site.products = FZ.catalog.items(st.site, st.sel, st.dir);
+    autoSpecs();
     st.qty = recQty(st.site);
     st.res = computeFor(st.site, st.qty);
     if (rebuild && S) rebuildFans();
+  }
+  // 직접 고르지 않은 제품은 필요 풍량에 맞는 사양을 자동 선택
+  function autoSpecs() {
+    const s = st.site, c = s.cond, V = s.dims.L * s.dims.W * s.dims.H;
+    const need = Math.max(0, FZ.sim.targetQ(s) - (c.q0 != null ? 0 : (c.ach0 || 0) * V));
+    const nEx = st.sel.filter(id => role(id) === 'exhaust').length;
+    st.sel.forEach(id => {
+      if (!FZ.SPECS[id] || FZ.SEL.manual[id]) return;
+      FZ.SEL.spec[id] = role(id) === 'exhaust' ? R.bestSpec(id, need / Math.max(1, nEx)) : FZ.SPECS[id].def;
+    });
+  }
+  function specSelect(id) {
+    const S = FZ.SPECS[id];
+    if (!S) return '<span class="chip">단일 사양</span>';
+    const cur = FZ.SEL.spec[id] ?? S.def, sp = FZ.specOf(id, cur);
+    return `<label class="specsel"><span class="small muted">사양 ${FZ.SEL.manual[id] ? '(직접 선택)' : '(자동 선택)'}</span>
+      <select data-spec="${id}" aria-label="${esc(FZ.PRODUCTS[id].name)} 사양">${S.rows.map((r, i) => { const o = FZ.specOf(id, i); return `<option value="${i}" ${i === cur ? 'selected' : ''}>${esc(r[0])}${o.perf ? ` · ${fmt(o.airflow)}㎥/h · ${fmt(o.power / 1000, 2)}kW · ${esc(r[2])}` : ''}</option>`; }).join('')}</select>
+      ${FZ.SEL.manual[id] ? `<button type="button" class="linkbtn" data-specauto="${id}">자동 선택으로</button>` : ''}
+      ${sp.hzNote ? `<span class="chip warn">${sp.hz}Hz 사양만 있음</span>` : ''}</label>`;
   }
   function setSel(ids) {
     st.sel = ids; ids.forEach(id => { if (!st.dir[id]) st.dir[id] = tag(id).def; });
@@ -262,7 +290,8 @@
           <span class="stepper" role="group" aria-label="${esc(p.name)} 수량"><button type="button" data-q="-1" data-id="${id}" aria-label="한 대 줄이기">−</button><output class="num">${st.qty[id]}</output><button type="button" data-q="1" data-id="${id}" aria-label="한 대 늘리기">+</button></span>
           ${dirSeg(id, st.dir[id], 'data-dir')}
         </div>
-        <span class="small muted">${esc(I.MOUNT_LABEL[mountOf(it)])} · 권장 ${FZ.sim.recommend(s, it)}대 (${esc(sizingText(s, it))})</span>
+        ${specSelect(id)}
+        <span class="small muted">${esc(I.MOUNT_LABEL[mountOf(it)])} · 대당 ${p.airflow ? fmt(p.airflow) + '㎥/h · ' : ''}${p.power ? fmt(p.power / 1000, 2) + 'kW' : ''} · 권장 ${FZ.sim.recommend(s, it)}대 (${esc(sizingText(s, it))})</span>
         <button type="button" class="linkbtn" style="align-self:flex-start;color:var(--muted)" data-remove="${id}">빼기</button>
       </div></div>`;
   }
@@ -271,6 +300,10 @@
       const id = b.dataset.id; st.qty[id] = Math.max(1, Math.min(40, st.qty[id] + +b.dataset.q));
       st.res = computeFor(st.site, st.qty); rebuildFans(); renderLeft(); renderRight();
     }));
+    root.querySelectorAll('[data-spec]').forEach(sl => sl.addEventListener('change', () => {
+      FZ.SEL.spec[sl.dataset.spec] = +sl.value; FZ.SEL.manual[sl.dataset.spec] = true; applySel(); renderLeft(); renderRight();
+    }));
+    root.querySelectorAll('[data-specauto]').forEach(b => b.addEventListener('click', () => { delete FZ.SEL.manual[b.dataset.specauto]; applySel(); renderLeft(); renderRight(); }));
     root.querySelectorAll('[data-dir]').forEach(b => b.addEventListener('click', () => { st.dir[b.dataset.dir] = b.dataset.d; applySel(); renderLeft(); renderRight(); }));
     root.querySelectorAll('[data-remove]').forEach(b => b.addEventListener('click', () => setSel(st.sel.filter(x => x !== b.dataset.remove))));
     root.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', () => {
@@ -473,7 +506,7 @@
         ${e.saveKWh > 0 ? `<tr><td>기존 대비 전기요금 절감 / CO₂ 감축</td><td class="num">–</td><td class="num" style="color:#15803d"><b>${fmt(e.saveWon / 10000)}만원</b> / ${fmt(e.co2t, 1)}t</td><td></td></tr>` : ''}
         ${r.prod && r.prod.value > 0 ? `<tr><td>생산성·축산 개선 환산</td><td class="num">–</td><td class="num" style="color:#15803d"><b>${fmt(r.prod.value)}만원</b>/년</td><td></td></tr>` : ''}
       </tbody></table></div>
-      <div class="foot">가정값: 전기요금 ${fmt(st.prm.elecPrice)}원/kWh · 배출계수 ${st.prm.co2Factor}kgCO₂/kWh · EC 절감률 ${st.prm.ecSave}% · 연 가동 ${fmt(e.hrs)}시간(부하율 80%).<br>
+      <div class="foot">사양 기준: ${FZ.SEL.hz}Hz. 가정값: 전기요금 ${fmt(st.prm.elecPrice)}원/kWh · 배출계수 ${st.prm.co2Factor}kgCO₂/kWh · EC 절감률 ${st.prm.ecSave}% · 연 가동 ${fmt(e.hrs)}시간(부하율 80%).<br>
         본 자료는 대표 조건을 넣은 단순 모델의 참고 추정치이며 성능을 보증하지 않습니다. 적합도는 「제품별 용도 메트릭스」 기준, 사양은 카탈로그 대표 모델(50Hz, 일부 60Hz) 기준이고 * 표시는 가정값이 포함된 제품입니다.</div>
       <div class="acts"><button type="button" id="copySum" class="pri">요약 텍스트 복사</button><button type="button" id="closeSheet">닫기</button></div>
       <textarea id="copyBox" readonly hidden style="width:100%;height:160px;font:12px var(--f-mono)"></textarea></div>`;
@@ -585,8 +618,9 @@
     $('left').querySelectorAll('[data-pf]').forEach(b => b.addEventListener('click', () => { st.pfilter = b.dataset.pf; renderProductList(); }));
     $('left').querySelectorAll('[data-pid]').forEach(b => b.addEventListener('click', () => showProduct(b.dataset.pid)));
   }
-  function renderProductDetail() {
+  function renderProductDetail(keepScroll) {
     const id = st.pid, p = P[id], t = tag(id);
+    const keepTop = $('right').scrollTop;
     const good = R.forProduct(id).filter(x => x.ok && x.score > 0);
     const top = good.slice(0, 3);
     const same = Object.keys(P).filter(k => P[k].group === p.group && P[k].airflow > 0 && P[k].role !== 'hvls').slice(0, 8);
@@ -601,6 +635,7 @@
         <div class="chips" style="margin-top:6px">${t.solves.map(x => `<span class="chip ok">${esc(FZ.PROBLEMS.find(q => q.id === x).label)}</span>`).join('')}</div></div></div>
       <div class="specs"><div><span>대당 풍량(㎥/h)</span><em>${p.airflow ? fmt(p.airflow) : '–'}</em></div><div><span>소비전력</span><em>${p.power ? fmt(p.power / 1000, 2) + 'kW' : '–'}</em></div><div><span>정압</span><em>${esc(p.pressure || '–')}</em></div></div>
       <ul class="feat">${p.features.map(f => `<li>${esc(f)}</li>`).join('')}</ul>
+      ${specTable(id)}
       <div class="card"><h3>공기 방향 · 설치 방식</h3><p class="small">${esc(dirText)}</p><p class="small muted">설치: ${esc(I.MOUNT_LABEL[mountOf({ place })] || '–')}${p.rep ? ' · 일부 수치는 가정값' : ''}</p></div>
       ${same.length > 1 ? `<div class="card"><h3>같은 제품군 비교</h3><span class="small muted">풍량(㎥/h)</span><div class="bars">${bars('airflow', maxQ, '')}</div><span class="small muted">소비전력</span><div class="bars">${bars('power', maxW, 'kW')}</div></div>` : ''}
       <div><h3>이런 환경에 맞아요</h3><p class="note" style="margin-top:2px">용도별 기본 조건에서 추천 점수를 계산한 순위입니다. 누르면 그 환경으로 시뮬레이션합니다.</p></div>
@@ -615,7 +650,25 @@
         <span class="k">상담 첫 질문</span><ul>${sd.questions.map(v => `<li>${esc(v)}</li>`).join('')}</ul>
         <span class="k">강조할 점</span><ul>${sd.points.map(v => `<li>${esc(v)}</li>`).join('')}</ul></div>`; }).join('')}`;
     $('right').querySelectorAll('[data-sim]').forEach(b => b.addEventListener('click', () => simulate(b.dataset.sim, id)));
-    $('right').scrollTop = 0;
+    $('right').querySelectorAll('[data-srow]').forEach(tr => {
+      const pickRow = () => {
+        const before = P[id].model3d;
+        FZ.SEL.spec[id] = +tr.dataset.srow; FZ.SEL.manual[id] = true;
+        if (P[id].model3d !== before) { const y = $('right').scrollTop; showProduct(id); $('right').scrollTop = y; } // 모델에 따라 3D 형상이 바뀜
+        else renderProductDetail(true);
+      };
+      tr.addEventListener('click', pickRow); tr.addEventListener('keydown', e => { if (e.key === 'Enter') pickRow(); });
+    });
+    $('right').scrollTop = keepScroll ? keepTop : 0;
+  }
+  function specTable(id) {
+    const S = FZ.SPECS[id];
+    if (!S) return '<p class="note">카탈로그 사양표가 없어 대표 모델 1종만 넣었습니다.</p>';
+    const cur = FZ.SEL.spec[id] ?? S.def;
+    return `<div class="card"><div class="row"><h3>사양 비교 · ${FZ.SEL.hz}Hz</h3><span class="small muted">카탈로그 ${esc(S.src)}</span></div>
+      <div class="tw"><table class="spect"><thead><tr><th>모델</th><th>임펠러</th><th>전원</th><th class="num">풍량㎥/h</th><th class="num">전력W</th><th class="num">정압</th><th class="num">kg</th></tr></thead><tbody>
+      ${S.rows.map((r, i) => { const o = FZ.specOf(id, i); return `<tr class="${i === cur ? 'on' : ''}" data-srow="${i}" tabindex="0"><td>${esc(r[0])}${o.hzNote ? ' *' : ''}</td><td class="num">${r[1] ? 'Ø' + r[1] : '–'}</td><td>${esc(r[2])}</td><td class="num">${fmt(o.airflow)}</td><td class="num">${fmt(o.power)}</td><td class="num">${o.pressure != null ? o.pressure : '–'}</td><td class="num">${r[6] ?? '–'}</td></tr>`; }).join('')}
+      </tbody></table></div><p class="note">행을 누르면 그 사양이 선택되어 비교·시뮬레이션에 반영됩니다.${S.rows.some((r, i) => FZ.specOf(id, i).hzNote) ? ' * 표시는 ' + (FZ.SEL.hz === 50 ? '60' : '50') + 'Hz 값만 있는 모델입니다.' : ''}</p></div>`;
   }
   function renderProductHud() {
     const hud = $('hud'); hud.hidden = false;
@@ -660,7 +713,7 @@
   }
 
   /* ---------- 프레임 ---------- */
-  const SPIN = { hvls: 1.4, belt: 9, propeller: 11, roof: 10, inline: 14, centrifugal: 14, centrifugalSus: 14, ceilvent: 14, circ: 12, jet: 16, ec: 13, diffuser: 0, axialStand: 12, defroster: 7 };
+  const SPIN = { hvls: 1.4, hvlsBldc: 1.4, belt: 9, boxMesh: 9, propeller: 11, propBarn: 10, propSmall: 13, propellerDark: 12, roof: 10, roofEC: 12, aspirator: 8, inline: 14, vaneAxial: 14, centrifugal: 14, centrifugalSus: 14, sirocoBox: 14, sirocoFrame: 14, sirocoDouble: 14, cabinet: 14, cabinetMulti: 14, squareInline: 14, hangerBox: 12, ceilvent: 14, pipefan: 14, plasticWall: 13, jet: 16, ec: 13, diffuser: 0, axialStand: 12, axialStandBlue: 12, axialStandGrey: 12, portableDrum: 14, portableFrame: 13, standFan: 9, defroster: 7 };
   function spinFan(f, rate, dt) { if (!f.rotor) return; if (f.axis === 'y') f.rotor.rotation.y += rate * dt; else f.rotor.rotation.z += rate * dt; }
   function tick(dt, time) {
     if (st.view === 'product') { if (SHOW) SHOW.tick(dt, time, st.pOn); return; }

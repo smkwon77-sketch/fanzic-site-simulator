@@ -28,7 +28,7 @@ window.FZ = window.FZ || {};
       pollutant: { name: '이산화탄소(CO₂)', unit: 'ppm', cOut: 420, c0: 1750, limit: 1000, limitLabel: '실내 기준 1,000', dec: 0 },
       pm: { ...PM }, tempOff: true, mode: 'office', hours: 12, days: 330,
       target: { type: 'perPerson', value: 30 },
-      defaults: ['square_duct', 'fandora', 'diffuser'],
+      defaults: ['square_duct', 'fandora', 'hoodcap'],
       heatSources: [], inlets: ['+z'],
       story: '저소음 사각 덕트팬으로 손님이 몰려도 CO₂를 기준 아래로 유지하고, 팬도라 필터로 냄새·먼지를 줄입니다.'
     },
@@ -39,7 +39,7 @@ window.FZ = window.FZ || {};
       pollutant: { name: '이산화탄소(CO₂)', unit: 'ppm', cOut: 420, c0: 1500, limit: 1000, limitLabel: '실내 기준 1,000', dec: 0 },
       pm: { ...PM }, tempOff: true, mode: 'none', hours: 24, days: 365,
       target: { type: 'ach', value: 6 },
-      defaults: ['sus_sirocco', 'purigen', 'diffuser'],
+      defaults: ['sus_sirocco', 'purigen', 'diffuser_fan'],
       heatSources: [], inlets: ['+z'],
       story: '위생적인 SUS 시로코팬으로 병실 환기횟수를 확보하고, HEPA 디퓨져 필터로 깨끗한 공기를 공급합니다.'
     },
@@ -50,9 +50,9 @@ window.FZ = window.FZ || {};
       pollutant: { name: '유증기', unit: 'mg/㎥', cOut: 0, c0: 3, limit: 1, limitLabel: '참고 관리값 1.0', dec: 2 },
       mode: 'worker', hours: 12, days: 330,
       target: { type: 'ach', value: 30 },
-      defaults: ['double_sirocco', 'fandora_box', 'hoodcap'],
+      defaults: ['double_sirocco', 'fandora', 'hoodcap'],
       heatSources: [[0, -0.3, 0.35, 1]], inlets: ['+z'],
-      story: '양흡 시로코팬으로 기름 섞인 열기를 덕트 끝까지 뽑고, 팬도라 필터박스·후드캡으로 배출구를 깔끔하게 마감합니다.'
+      story: '양흡 시로코팬으로 기름 섞인 열기를 덕트 끝까지 뽑고, 팬도라 필터·후드캡으로 배출구를 깔끔하게 마감합니다.'
     },
     {
       id: 'factory', name: '공장', sub: '제조 공장·생산동', kind: 'factory',
@@ -61,9 +61,9 @@ window.FZ = window.FZ || {};
       pollutant: { name: '미세먼지(PM10)', unit: '㎍/㎥', cOut: 40, c0: 300, limit: 100, limitLabel: '실내 관리기준 100', dec: 0, filterable: true },
       mode: 'worker', hours: 10, days: 300,
       target: { type: 'ach', value: 8 },
-      defaults: ['prop_large', 'tfp-g60-chimney', 'hvls_bldc'],
+      defaults: ['prop_large', 'tfp-g60-chimney', 'hvls'],
       heatSources: [[-0.25, -0.15, 0.18, 1], [0.1, 0.2, 0.15, 0.8], [0.3, -0.2, 0.12, 0.7]], inlets: ['-x'],
-      story: '측벽 대형 고압팬과 지붕 루프팬으로 열기를 빼고, 대형 실링팬으로 작업자 체감온도를 낮춥니다.'
+      story: '측벽 대형 고압팬과 굴뚝팬으로 열기를 빼고, 대형실링팬으로 작업자 체감온도를 낮춥니다.'
     },
     {
       id: 'logistics', name: '물류센터', sub: '물류창고·대형 매장', kind: 'logistics',
@@ -72,9 +72,9 @@ window.FZ = window.FZ || {};
       pollutant: { name: '미세먼지(PM10)', unit: '㎍/㎥', cOut: 40, c0: 250, limit: 100, limitLabel: '실내 관리기준 100', dec: 0, filterable: true },
       mode: 'worker', hours: 12, days: 330,
       target: { type: 'ach', value: 2 },
-      defaults: ['hvls_bldc', 'tfp-g60-chimney'],
+      defaults: ['hvls', 'tfp-g60-chimney'],
       heatSources: [[0, 0, 0.5, 0.6]], inlets: ['-x', '+z'],
-      story: '대형 실링팬 몇 대로 선풍기 수십 대를 대체하고, 지붕 루프팬으로 축열된 상부 열기를 배출합니다.'
+      story: '대형실링팬 몇 대로 선풍기 수십 대를 대체하고, 굴뚝팬으로 축열된 상부 열기를 배출합니다.'
     },
     {
       id: 'barn', name: '축사', sub: '육계·산란계 계사', kind: 'barn',
@@ -108,7 +108,7 @@ window.FZ = window.FZ || {};
       target: { type: 'ach', value: 5 },
       defaults: ['tfp-g60-chimney', 'tfd-g75'],
       heatSources: [[-0.2, 0, 0.12, 1.4], [0.25, 0.1, 0.1, 1.1]], inlets: ['-z', '+z'],
-      story: '지붕 루프팬으로 고열을 배출하고, 스탠드형 대형 베인 축류팬으로 열원 주변 작업자를 집중 냉각합니다.'
+      story: '굴뚝팬으로 고열을 배출하고, 이동식 대형 덕트팬으로 열원 주변 작업자를 집중 냉각합니다.'
     },
     {
       id: 'pool', name: '수영장', sub: '실내수영장·고습 시설', kind: 'pool',
@@ -128,9 +128,9 @@ window.FZ = window.FZ || {};
       pollutant: null,
       mode: 'crop', hours: 10, days: 120,
       target: { type: 'ach', value: 30 },
-      defaults: ['tfh-h80', 'tff-f30', 'tfu-g110'],
+      defaults: ['tfh-h80', 'vane_duct', 'tfu-g110'],
       heatSources: [[0, 0, 0.6, 0.7]], inlets: ['-x'],
-      story: '온실 전용팬으로 한낮 고온을 배출하고 서큘레이션팬으로 정체 구역을 없앱니다. 겨울에는 서리방지팬이 냉해를 막습니다.'
+      story: '하우스팬으로 한낮 고온을 배출하고 덕트팬으로 정체 구역에 바람을 보냅니다. 겨울에는 그린팬(방제팬)이 냉해를 막습니다.'
     },
     {
       id: 'parking', name: '지하주차장', sub: '아파트·상가 지하주차장', kind: 'parking', matrixOut: true,
@@ -139,9 +139,9 @@ window.FZ = window.FZ || {};
       pollutant: { name: '일산화탄소(CO)', unit: 'ppm', cOut: 0.5, c0: 40, limit: 25, limitLabel: '주차장 기준 25', dec: 1 },
       mode: 'none', hours: 14, days: 365,
       target: { type: 'flowPerArea', value: 25 },
-      defaults: ['tfm-g1000', 'tfz-e33'],
+      defaults: ['square_duct', 'tfz-e33'],
       heatSources: [], inlets: ['-x'],
-      story: '대형 덕트 인라인팬으로 법정 환기량을 확보하고, 유인 제트팬이 덕트 없이 매연 정체 구역을 배기구 쪽으로 밀어냅니다.'
+      story: '인라인 덕트팬·주차장팬으로 법정 환기량을 확보하고, 유인팬이 덕트 없이 매연 정체 구역을 배기구 쪽으로 밀어냅니다.'
     }
   ];
 
@@ -250,7 +250,7 @@ window.FZ = window.FZ || {};
     }
   };
   C.sizingFor = function (site, id, nEx) {
-    const p = FZ.PRODUCTS[id];
+    const p = FZ.eff(id);
     if (p.role === 'exhaust') return { type: 'share', share: 1 / Math.max(1, nEx) };
     if (p.role === 'hvls') return { type: 'cover' };
     if (p.role === 'circulate') return { type: 'perArea', value: 120 };
@@ -259,19 +259,18 @@ window.FZ = window.FZ || {};
       return site.cond.workers ? { type: 'perWorkers', value: 6 } : { type: 'perArea', value: 200 };
     }
     if (id === 'purigen') return { type: 'perArea', value: 30 };
-    if (id === 'fandora') return { type: 'perArea', value: 60 };
-    if (id === 'fandora_box') return { type: 'fixed', n: 2 };
-    if (id === 'diffuser') return { type: 'perArea', value: 40 };
-    if (id === 'hoodcap') return { type: 'fixed', n: 2 };
-    if (id === 'safety_net') return { type: 'matchWall' };
+    if (id === 'fandora') return p.mount === 'duct' ? { type: 'fixed', n: 2 } : { type: 'perArea', value: 60 };
+    if (id === 'hoodcap') return p.mount === 'ceiling' ? { type: 'perArea', value: 40 } : { type: 'fixed', n: 2 };
+    if (id === 'safety_net' || id === 'shutter_unit' || id === 'guard_box') return { type: 'matchWall' };
+    if (id === 'controller' || id === 'phase_ctrl') return { type: 'fixed', n: 1 };
     return { type: 'fixed', n: 2 };
   };
   // 선택 제품 → 계산·배치 항목 (dirs: 제품별 흡기/배기)
   C.items = function (site, ids, dirs) {
-    const nEx = ids.filter(id => FZ.PRODUCTS[id].role === 'exhaust').length;
+    const nEx = ids.filter(id => FZ.eff(id).role === 'exhaust').length;
     const lanes = {};
     return ids.map(id => {
-      const p = FZ.PRODUCTS[id];
+      const p = FZ.eff(id);
       const place = C.placeFor(site, p);
       const lane = lanes[place] = (lanes[place] ?? -1) + 1;
       const mode = (dirs && dirs[id]) || (FZ.TAGS[id] && FZ.TAGS[id].def) || null;
@@ -287,7 +286,7 @@ window.FZ = window.FZ || {};
   // 조건의 목표 환기량 (대수 적정성 판단용)
   R.needQ = function (cond) { const s = E.build(cond); return Math.max(0, FZ.sim.targetQ(s) - (s.cond.q0 != null ? 0 : (s.cond.ach0 || 0) * s.dims.L * s.dims.W * s.dims.H)); };
   R.score = function (cond, pid, needQ) {
-    const p = FZ.PRODUCTS[pid], t = FZ.TAGS[pid];
+    const p = FZ.eff(pid), t = FZ.TAGS[pid];
     const req = MOUNT_REQ[p.mount];
     if (req && !cond.mounts[req]) return { ok: false, score: -9, reasons: [], why: `${R.mountLabel[req]} 불가` };
     if (p.minHeight && cond.H < p.minHeight) return { ok: false, score: -9, reasons: [], why: `천장 ${p.minHeight}m 이상 필요` };
@@ -300,7 +299,9 @@ window.FZ = window.FZ || {};
     else if (cond.area < t.area[0] * 0.5 || cond.area > t.area[1] * 2) s -= 2;
     // 환기 제품 대수 적정성: 너무 많이 필요하면 감점, 적당하면 가점
     if (p.role === 'exhaust' && needQ != null && p.airflow) {
-      const n = needQ / (p.airflow * (p.eff || 1));
+      const best = R.bestSpec(pid, needQ);
+      const q = best != null ? FZ.specOf(pid, best).airflow : p.airflow;
+      const n = needQ / (q * (p.eff || 1));
       if (n > 25) s -= 3; else if (n >= 0.5 && n <= 14) s += 1;
     }
     if ((USE_META[cond.use].prefer || []).includes(pid)) { s += 2; reasons.unshift('대표 제품'); }
@@ -310,6 +311,22 @@ window.FZ = window.FZ || {};
     if (cond.special.quiet && t.loud) s -= 2;
     if (req) reasons.push(R.mountLabel[req]);
     return { ok: true, score: s, reasons, rating: rt };
+  };
+  // 필요 풍량(㎥/h)에 맞는 사양: 대수가 2~12대인 모델 중 총 소비전력이 가장 작은 것
+  R.bestSpec = function (pid, needQ) {
+    const S = FZ.SPECS[pid];
+    if (!S || S.rows.length < 2 || !(needQ > 0)) return S ? S.def : null;
+    const eff = FZ.PRODUCTS[pid].eff || 1;
+    let best = null, bestCost = Infinity;
+    S.rows.forEach((r, i) => {
+      const s = FZ.specOf(pid, i);
+      if (!s.airflow) return;
+      const n = Math.max(1, Math.ceil(needQ / (s.airflow * eff)));
+      const fit = n >= 2 && n <= 12 ? 0 : (n < 2 ? (2 - n) * 0.15 : (n - 12) * 0.1);
+      const cost = n * s.power * (1 + fit) + (s.phase.startsWith('3') ? 0 : 0.001);
+      if (cost < bestCost) { bestCost = cost; best = i; }
+    });
+    return best;
   };
   // 조건에 맞는 제품 전체 (점수순)
   R.candidates = function (cond) {
@@ -325,7 +342,7 @@ window.FZ = window.FZ || {};
     const pick = [];
     const movers = cs.filter(x => role(x.id) === 'exhaust');
     if (movers[0]) pick.push(movers[0]);
-    const m2 = movers.find(x => x !== movers[0] && FZ.PRODUCTS[x.id].mount !== FZ.PRODUCTS[movers[0].id].mount && x.score >= movers[0].score - 2);
+    const m2 = movers.find(x => x !== movers[0] && FZ.eff(x.id).mount !== FZ.eff(movers[0].id).mount && x.score >= movers[0].score - 2);
     if (m2 && cond.area >= 600) pick.push(m2);
     if (cond.problems.includes('heat') || cond.problems.includes('stagnant')) {
       const circ = cs.filter(x => ['hvls', 'circulate', 'spot'].includes(role(x.id)) && x.score >= 4);
@@ -338,9 +355,9 @@ window.FZ = window.FZ || {};
       if (f) pick.push(f);
     }
     if (pick.length < 4) {
-      const has = m => pick.some(x => FZ.PRODUCTS[x.id].mount === m && role(x.id) === 'exhaust');
+      const has = m => pick.some(x => FZ.eff(x.id).mount === m && role(x.id) === 'exhaust');
       const acc = cs.find(x => role(x.id) === 'accessory' && x.score >= 4 && !pick.includes(x) &&
-        (x.id === 'safety_net' ? has('wall') : x.id === 'hoodcap' ? (has('duct') || has('ceiling')) : true));
+        (['safety_net', 'shutter_unit', 'controller', 'phase_ctrl'].includes(x.id) ? has('wall') : x.id === 'guard_box' ? pick.some(y => y.id === 'belt_parking') : x.id === 'hoodcap' ? (has('duct') || has('ceiling')) : true));
       if (acc) pick.push(acc);
     }
     if (!pick.length) cs.slice(0, 2).forEach(x => pick.push(x));

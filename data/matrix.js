@@ -9,14 +9,6 @@ FZ.MATRIX = {
   "factory": "△",
   "logistics": "△"
  },
- "fandora_box": {
-  "house": "◎",
-  "commercial": "◎",
-  "hospital": "◎",
-  "restaurant": "◎",
-  "factory": "△",
-  "logistics": "△"
- },
  "purigen": {
   "house": "◎",
   "commercial": "◎",
@@ -44,14 +36,6 @@ FZ.MATRIX = {
   "pool": "○"
  },
  "mini_sirocco": {
-  "house": "○",
-  "commercial": "◎",
-  "hospital": "◎",
-  "restaurant": "◎",
-  "factory": "○",
-  "logistics": "△"
- },
- "multi_sirocco": {
   "house": "○",
   "commercial": "◎",
   "hospital": "◎",
@@ -124,17 +108,6 @@ FZ.MATRIX = {
   "factory": "◎",
   "logistics": "◎",
   "barn": "○",
-  "datacenter": "○",
-  "plant": "◎",
-  "pool": "△"
- },
- "turbo_hp": {
-  "commercial": "△",
-  "hospital": "△",
-  "restaurant": "△",
-  "factory": "◎",
-  "logistics": "◎",
-  "barn": "○",
   "datacenter": "◎",
   "plant": "◎",
   "pool": "△"
@@ -158,14 +131,9 @@ FZ.MATRIX = {
  "prop_large": {
   "factory": "◎",
   "logistics": "◎",
-  "barn": "○",
+  "barn": "◎",
   "datacenter": "◎",
   "plant": "◎"
- },
- "prop_barn": {
-  "factory": "△",
-  "logistics": "△",
-  "barn": "◎"
  },
  "prop_belt": {
   "factory": "◎",
@@ -188,44 +156,21 @@ FZ.MATRIX = {
   "datacenter": "○",
   "plant": "◎"
  },
- "blower_dust": {
-  "factory": "◎",
-  "logistics": "○",
-  "datacenter": "○",
-  "plant": "◎"
- },
  "blower_dry": {
   "factory": "◎",
   "logistics": "○",
   "barn": "○",
   "plant": "◎"
  },
- "hvls_ac": {
-  "restaurant": "○",
-  "factory": "◎",
-  "logistics": "◎",
-  "barn": "◎",
-  "datacenter": "△",
-  "plant": "△"
- },
- "hvls_bldc": {
-  "commercial": "○",
-  "hospital": "○",
+ "hvls": {
   "restaurant": "○",
   "factory": "◎",
   "logistics": "◎",
   "barn": "◎",
   "datacenter": "◎",
-  "plant": "△"
- },
- "diffuser": {
-  "house": "◎",
-  "commercial": "◎",
-  "hospital": "◎",
-  "restaurant": "◎",
-  "factory": "○",
-  "logistics": "△",
-  "datacenter": "○"
+  "plant": "△",
+  "commercial": "○",
+  "hospital": "○"
  },
  "hoodcap": {
   "house": "◎",
@@ -233,7 +178,8 @@ FZ.MATRIX = {
   "hospital": "◎",
   "restaurant": "◎",
   "factory": "○",
-  "logistics": "△"
+  "logistics": "△",
+  "datacenter": "○"
  },
  "safety_net": {
   "factory": "◎",
