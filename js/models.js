@@ -845,14 +845,14 @@ window.FZ = window.FZ || {};
       axis = 'y';
       const pan = new T.Mesh(new T.CylinderGeometry(s * 0.707, s * 0.69, s * 0.035, 4, 1), FC.white);
       pan.rotation.y = PI / 4; pan.position.y = -s * 0.025; g.add(pan);
-      const bulge = new T.Mesh(new T.CylinderGeometry(s * 0.69, s * 0.45, s * 0.03, 4, 1), FC.white);
-      bulge.rotation.y = PI / 4; bulge.position.y = -s * 0.065; g.add(bulge);
-      const dotM = FC.graphite, dotG = new T.CircleGeometry(s * 0.011, 6);
+      const bulge = new T.Mesh(new T.CylinderGeometry(s * 0.69, s * 0.52, s * 0.016, 4, 1), FC.white);
+      bulge.rotation.y = PI / 4; bulge.position.y = -s * 0.05; g.add(bulge);
+      const dotM = FC.graphite, dotG = new T.CircleGeometry(s * 0.008, 6);
       [[0, 1], [1, 0], [0, -1], [-1, 0]].forEach(([a, b]) => {
-        for (let i = 0; i < 4; i++) for (let j = 0; j < 4 - Math.floor(i / 2); j++) {
+        for (let i = 0; i < 7; i++) for (let j = 0; j <= i; j++) { // 바깥이 넓고 가운데로 뾰족한 화살표
           const d = new T.Mesh(dotG, dotM); d.rotation.x = PI / 2;
-          const u = (j - (3 - Math.floor(i / 2)) / 2) * s * 0.03, v = s * 0.16 + i * s * 0.028;
-          d.position.set(a * v + b * u, -s * 0.081, b * v + a * u); g.add(d);
+          const u = (j - i / 2) * s * 0.024, v = s * 0.12 + i * s * 0.024;
+          d.position.set(a * v + b * u, -s * 0.0585, b * v + a * u); g.add(d);
         }
       });
       const housing = box(s * 0.7, s * 0.25, s * 0.7, FC.galvLight); housing.position.y = s * 0.13; g.add(housing);
@@ -944,8 +944,8 @@ window.FZ = window.FZ || {};
         rotor.position.z = -s * 0.03; g.add(rotor);
         // U자 브래킷 (위·아래에서 뒤로)
         const bm = fmat(0xc9ced3, 0.6, 0.4), bz = -s * 0.3;
-        [-1, 1].forEach(k => { const a = box(s * 0.05, s * 0.012, -bz, bm); a.position.set(0, k * s * 0.44, bz / 2); g.add(a); });
-        const v = box(s * 0.05, s * 0.88, s * 0.012, bm); v.position.z = bz; g.add(v);
+        [-1, 1].forEach(k => { const a = box(s * 0.035, s * 0.012, -bz, bm); a.position.set(0, k * s * 0.44, bz / 2); g.add(a); });
+        const v = box(s * 0.035, s * 0.88, s * 0.012, bm); v.position.z = bz - s * 0.01; g.add(v);
         const mot = tubeZ(s * 0.08, s * 0.08, s * 0.12, fmat(0x9aa2aa, 0.6, 0.4), 24, false); mot.position.z = bz + s * 0.07; g.add(mot);
         for (let i = 0; i < 14; i++) { const a = i / 14 * TAU, f = box(s * 0.012, s * 0.03, s * 0.1, fmat(0x9aa2aa, 0.6, 0.4)); f.position.set(Math.cos(a) * s * 0.09, Math.sin(a) * s * 0.09, bz + s * 0.07); f.rotation.z = a; g.add(f); }
         const gd = guard(R * 0.98, 5, 4, FC.wire, s * 0.004, s * 0.06); gd.position.z = -s * 0.16; g.add(gd);
@@ -1085,29 +1085,31 @@ window.FZ = window.FZ || {};
       const m = fmat(0xcfd4d9, 0.75, 0.36), r = s * 0.42;
       const pipe = cyl(s * 0.25, s * 0.25, s * 0.34, m, 40); pipe.position.y = s * 0.17; g.add(pipe);
       const fl = cyl(r * 1.08, r * 1.08, s * 0.02, m, 48); fl.position.y = s * 0.34; g.add(fl);
-      const top = cyl(r * 1.1, r * 1.1, s * 0.05, m, 48); top.position.y = s * 0.66; g.add(top);
+      const top = cyl(r * 1.02, r * 1.02, s * 0.04, m, 48); top.position.y = s * 0.66; g.add(top);
+      const cone = cyl(r * 0.5, s * 0.25, s * 0.14, FC.galv, 32); cone.position.y = s * 0.42; g.add(cone);
       for (let i = 0; i < 6; i++) { const a = i / 6 * TAU, st = box(s * 0.07, s * 0.3, s * 0.012, m); st.position.set(Math.cos(a) * r * 1.05, s * 0.5, Math.sin(a) * r * 1.05); st.rotation.y = -a + PI / 2; g.add(st); }
       rotor = new T.Group();
       for (let i = 0; i < 10; i++) { const a = i / 10 * TAU, b = box(s * 0.2, s * 0.2, s * 0.01, FC.sus); b.position.set(Math.cos(a) * r * 0.55, 0, Math.sin(a) * r * 0.55); b.rotation.y = -a + 0.6; rotor.add(b); }
       const disc = cyl(r * 0.8, r * 0.8, s * 0.01, FC.sus, 40); disc.position.y = s * 0.1; rotor.add(disc);
       rotor.position.y = s * 0.5; g.add(rotor);
-      const hood = cyl(r * 0.95, r, s * 0.42, m, 48); hood.position.y = s * 0.9; g.add(hood);
-      const dome = new T.Mesh(new T.SphereGeometry(r * 0.95, 32, 8, 0, TAU, 0, PI * 0.18), m); dome.scale.y = 0.6; dome.position.y = s * 1.05; g.add(dome);
-      for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) { const a = i / 4 * TAU + 0.4, lv = box(s * 0.24, s * 0.04, s * 0.05, m); lv.position.set(Math.cos(a) * r * 0.98, s * 0.78 + j * s * 0.09, Math.sin(a) * r * 0.98); lv.rotation.y = -a + PI / 2; g.add(lv); }
+      const hood = cyl(r * 0.8, r * 0.84, s * 0.34, m, 48); hood.position.y = s * 0.85; g.add(hood);
+      const dome = new T.Mesh(new T.SphereGeometry(r * 0.8, 32, 8, 0, TAU, 0, PI * 0.5), m); dome.scale.y = 0.18; dome.position.y = s * 1.02; g.add(dome);
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) { const a = i / 4 * TAU + 0.4, lv = box(s * 0.24, s * 0.04, s * 0.05, m); lv.position.set(Math.cos(a) * r * 0.83, s * 0.76 + j * s * 0.075, Math.sin(a) * r * 0.83); lv.rotation.y = -a + PI / 2; g.add(lv); }
     } else if (kind === 'roofEC') {
       // 루프팬 EC(TFR): 사각 받침 플랜지 + 경사진 몸체 + 윗면 격자 그릴 + 옆 제어함 (토출 = 위)
       axis = 'y';
       const m = fmat(0xe7eaed, 0.45, 0.38), W = s * 1.2;
-      const base = box(W * 1.1, s * 0.03, W * 1.1, m); base.position.y = s * 0.015; g.add(base);
-      const body = new T.Mesh(new T.CylinderGeometry(W * 0.64, W * 0.76, s * 0.45, 4, 1), m); body.rotation.y = PI / 4; body.position.y = s * 0.255; g.add(body);
+      const base = box(W * 0.98, s * 0.03, W * 0.98, m); base.position.y = s * 0.015; g.add(base);
+      [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(([a, b]) => { const br = box(s * 0.06, s * 0.08, s * 0.06, FC.galv); br.position.set(a * W * 0.36, s * 0.06, b * W * 0.36); g.add(br); });
+      const body = new T.Mesh(new T.CylinderGeometry(W * 0.68, W * 0.44, s * 0.4, 4, 1), m); body.rotation.y = PI / 4; body.position.y = s * 0.275; g.add(body);
       const rim = box(W * 0.92, s * 0.05, W * 0.92, m); rim.position.y = s * 0.5; g.add(rim);
       const gr = grid(W * 0.8, W * 0.8, 16, 16, FC.galv, s * 0.012); gr.rotation.x = -PI / 2; gr.position.y = s * 0.53; g.add(gr);
       const sh = box(W * 0.8, s * 0.004, W * 0.8, FC.shade); sh.position.y = s * 0.42; g.add(sh);
       rotor = new T.Group(); for (let i = 0; i < 7; i++) { const b = box(s * 0.3, s * 0.06, s * 0.01, FC.alu); b.position.x = s * 0.18; const a = new T.Group(); a.add(b); a.rotation.y = i / 7 * TAU; rotor.add(a); }
       rotor.position.y = s * 0.46; g.add(rotor);
-      const cb = box(s * 0.26, s * 0.16, s * 0.06, m); cb.position.set(-W * 0.2, s * 0.2, W * 0.45); cb.rotation.x = -0.35; g.add(cb);
-      const disp = box(s * 0.12, s * 0.05, s * 0.01, FC.black); disp.position.set(-W * 0.22, s * 0.22, W * 0.48); disp.rotation.x = -0.35; g.add(disp);
-      const lab = box(s * 0.18, s * 0.04, s * 0.01, FC.blue); lab.position.set(W * 0.25, s * 0.16, W * 0.5); lab.rotation.x = -0.35; g.add(lab);
+      const cb = box(s * 0.26, s * 0.14, s * 0.05, m); cb.position.set(-W * 0.18, s * 0.3, W * 0.3); cb.rotation.x = -0.55; g.add(cb);
+      const disp = box(s * 0.12, s * 0.05, s * 0.01, FC.black); disp.position.set(-W * 0.2, s * 0.31, W * 0.32); disp.rotation.x = -0.55; g.add(disp);
+      const lab = box(s * 0.18, s * 0.04, s * 0.01, FC.blue); lab.position.set(W * 0.22, s * 0.25, W * 0.29); lab.rotation.x = -0.55; g.add(lab);
     } else if (kind === 'hangerBox') {
       // 행거팬(TFN): 아연도 사각 케이스, 앞면(+z) 두 토출구 안 양흡 드럼, 위 행거 탭 4개, 옆 모터·벨트 커버
       const W = s, H = s * 0.42, D = s * 0.75, t = s * 0.012, m = FC.galv;
