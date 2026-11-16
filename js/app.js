@@ -92,19 +92,28 @@
       document.querySelectorAll('[data-hz]').forEach(x => x.setAttribute('aria-pressed', +x.dataset.hz === FZ.SEL.hz));
       if (st.view === 'env') { applySel(); renderLeft(); renderRight(); renderHud(); }
       else if (st.view === 'product') renderProductDetail(true);
+      else if (st.view === 'design') FZ.design.enter();
     }));
   }
   function setModeButtons(m) { document.querySelectorAll('.modes [data-mode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === m)); }
   function go(mode) {
     $('home').hidden = true;
     if (mode === 'matrix') { if (st.view === 'home') enterEnv(); openMatrix(); return; }
+    if (mode === 'design') { enterDesign(); return; }
     if (mode === 'product') enterProduct(st.pid); else enterEnv(st.cond);
   }
 
   /* =========================================================
      환경에서 찾기
      ========================================================= */
+  // 제품사양 선택(설계) 탭: js/design.js
+  function enterDesign() {
+    st.view = 'design'; setModeButtons('design');
+    disposeSite(); $('sheet').hidden = true;
+    FZ.design.enter();
+  }
   function enterEnv(cond, preset) {
+    if (FZ.design) FZ.design.leave();
     st.view = 'env'; setModeButtons('env');
     st.cond = cond ? JSON.parse(JSON.stringify(cond)) : FZ.env.defaultCond('factory');
     st.step = preset ? 'pick' : 'cond';
@@ -591,6 +600,7 @@
      제품에서 찾기 (영업 학습·타깃 발굴)
      ========================================================= */
   function enterProduct(pid) {
+    if (FZ.design) FZ.design.leave();
     st.view = 'product'; setModeButtons('product');
     disposeSite();
     $('legend').hidden = true; $('stepCap').hidden = true; $('sheet').hidden = true;
@@ -751,6 +761,7 @@
     }
   }
 
+  FZ.app = { enterEnv: (cond, preset) => fade(() => enterEnv(cond, preset)) };
   const _fan = FZ.models.fan;
   FZ.models.fan = function (kind, s) { const f = _fan(kind, s); f.group.userData.kind = kind; return f; };
 
