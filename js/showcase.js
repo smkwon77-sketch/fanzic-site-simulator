@@ -9,7 +9,7 @@ window.FZ = window.FZ || {};
   /* ---------- 썸네일 (사진 대신) ---------- */
   let thumbR = null;
   const thumbCache = {};
-  const THUMB_YAW = { inline: Math.PI - 0.6, squareInline: Math.PI - 0.6, ec: Math.PI - 0.6, cabinet: Math.PI - 0.6, cabinetMulti: Math.PI, centrifugal: -1.35, centrifugalSus: -0.05, sirocoDouble: -0.5, jet: -1.0, circ: -0.25, defroster: -0.3, belt: -0.5, propeller: -0.3, sirocoBox: -0.3, sirocoFrame: -0.05, plasticWall: Math.PI, propSmall: Math.PI - 0.3, vaneAxial: -0.3, portableDrum: 0.9, boxMesh: -0.3, hangerBox: -0.4, standFan: -0.2, controllerBox: -0.3, controllerPanel: -0.3, shutterBox: -0.4 };
+  const THUMB_YAW = { inline: Math.PI - 0.6, squareInline: Math.PI - 0.6, ec: Math.PI - 0.6, cabinet: Math.PI - 0.6, cabinetMulti: Math.PI, centrifugal: -1.35, centrifugalSus: -0.05, sirocoDouble: -0.5, jet: -1.0, circ: -0.25, defroster: -0.3, belt: -0.5, propeller: -0.3, sirocoBox: -0.3, glbF28: -0.3, glbF28Sus: -0.3, sirocoFrame: -0.05, plasticWall: Math.PI, propSmall: Math.PI - 0.3, vaneAxial: -0.3, portableDrum: 0.9, boxMesh: -0.3, hangerBox: -0.4, standFan: -0.2, controllerBox: -0.3, controllerPanel: -0.3, shutterBox: -0.4 };
   SC.thumb = function (pid) {
     const p = FZ.eff(pid), key = pid + '|' + p.model3d; // 모델에 따라 3D 종류가 바뀜
     if (thumbCache[key]) return thumbCache[key];
@@ -32,7 +32,9 @@ window.FZ = window.FZ || {};
     const cam = new T.PerspectiveCamera(32, 4 / 3, 0.01, 100);
     cam.position.set(r * 1.1, r * 0.75, r * 1.9); cam.lookAt(0, 0, 0);
     thumbR.render(scene, cam);
-    return (thumbCache[key] = thumbR.domElement.toDataURL('image/png'));
+    const url = thumbR.domElement.toDataURL('image/png');
+    if (FZ.models.glbPending && FZ.models.glbPending(p.model3d)) return url; // 실물 3D 받는 중: 다음에 다시 그림
+    return (thumbCache[key] = url);
   };
   SC.imageOf = function (pid) {
     const t = FZ.TAGS[pid];

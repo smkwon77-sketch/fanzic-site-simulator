@@ -723,7 +723,7 @@
   }
 
   /* ---------- 프레임 ---------- */
-  const SPIN = { hvls: 1.4, hvlsBldc: 1.4, belt: 9, boxMesh: 9, propeller: 11, propBarn: 10, propSmall: 13, propellerDark: 12, roof: 10, roofEC: 12, aspirator: 8, inline: 14, vaneAxial: 14, centrifugal: 14, centrifugalSus: 14, sirocoBox: 14, sirocoFrame: 14, sirocoDouble: 14, cabinet: 14, cabinetMulti: 14, squareInline: 14, hangerBox: 12, ceilvent: 14, pipefan: 14, plasticWall: 13, jet: 16, ec: 13, diffuser: 0, axialStand: 12, axialStandBlue: 12, axialStandGrey: 12, portableDrum: 14, portableFrame: 13, standFan: 9, defroster: 7 };
+  const SPIN = { hvls: 1.4, hvlsBldc: 1.4, belt: 9, boxMesh: 9, propeller: 11, propBarn: 10, propSmall: 13, propellerDark: 12, roof: 10, roofEC: 12, aspirator: 8, inline: 14, vaneAxial: 14, centrifugal: 14, centrifugalSus: 14, sirocoBox: 14, glbF28: 14, glbF28Sus: 14, sirocoFrame: 14, sirocoDouble: 14, cabinet: 14, cabinetMulti: 14, squareInline: 14, hangerBox: 12, ceilvent: 14, pipefan: 14, plasticWall: 13, jet: 16, ec: 13, diffuser: 0, axialStand: 12, axialStandBlue: 12, axialStandGrey: 12, portableDrum: 14, portableFrame: 13, standFan: 9, defroster: 7 };
   function spinFan(f, rate, dt) { if (!f.rotor) return; if (f.axis === 'y') f.rotor.rotation.y += rate * dt; else f.rotor.rotation.z += rate * dt; }
   function tick(dt, time) {
     if (st.view === 'product') { if (SHOW) SHOW.tick(dt, time, st.pOn); return; }
@@ -761,6 +761,8 @@
     }
   }
 
+  // 실물 3D(GLB)를 다 받으면, 받기 전에 그린 썸네일(빈 그림)을 다시 그림
+  window.addEventListener('fz-glb', () => { if (st.view === 'product' && st.pid) { renderProductList(); renderProductDetail(true); } });
   FZ.app = { enterEnv: (cond, preset) => fade(() => enterEnv(cond, preset)) };
   const _fan = FZ.models.fan;
   FZ.models.fan = function (kind, s) { const f = _fan(kind, s); f.group.userData.kind = kind; return f; };

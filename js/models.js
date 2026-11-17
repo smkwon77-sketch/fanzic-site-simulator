@@ -454,7 +454,53 @@ window.FZ = window.FZ || {};
      cabinetMulti(multi_sirocco) circ(TFF-F30 브로슈어) jet(jet) ec(EC 팬) diffuser(diffuser) purigen(purigen)
      axialStand(portable_orange) axialStandBlue(portable_blue) defroster(TFU-G110 브로슈어) ceilvent(plastic_ceiling)
      pipefan(plastic_vent) filterbox(fandora 그릴형) filterboxDuct(fandora 박스형) hoodcap(hoodcap) */
+  /* 설계 3D(STEP → GLB) 실물 모델. GLB 좌표: m 단위, 위 = +y, 토출구 = +z, 노드 housing(정지)·impeller(회전, 축 = x).
+     받아 오기 전에는 fb(코드 형상)를 보여 주고, 받으면 바꿔 끼움. h = GLB 전체 높이(m) → fb 의 몸통 높이(s × 0.95)에 맞춤 */
+  const GLB = {
+    glbF28: { url: 'assets/models/tfb-f28.glb', fb: 'sirocoBox', h: 0.4416, sus: false },
+    glbF28Sus: { url: 'assets/models/tfb-f28.glb', fb: 'sirocoBox', h: 0.4416, sus: true }
+  };
+  const glbCache = {}, glbDone = {};
+  function loadGlb(url) {
+    if (!glbCache[url]) glbCache[url] = new Promise((res, rej) => {
+      if (!T.GLTFLoader) { rej(new Error('GLTFLoader 없음')); return; }
+      new T.GLTFLoader().load(url, gl => {
+        gl.scene.traverse(o => { if (o.isMesh && !o.geometry.attributes.normal) o.geometry.computeVertexNormals(); });
+        glbDone[url] = true; res(gl.scene);
+        window.dispatchEvent(new CustomEvent('fz-glb', { detail: url })); // 썸네일 등 다시 그리기
+      }, undefined, rej);
+    });
+    return glbCache[url];
+  }
+  // 썸네일 등 한 번만 그리는 곳: 아직 받는 중이면 캐시하지 않도록
+  M.glbPending = kind => !!GLB[kind] && !glbDone[GLB[kind].url];
+  M.glbLoad = kind => GLB[kind] ? loadGlb(GLB[kind].url) : Promise.resolve(null);
+  const GLB_M = {
+    paint: fmat(0xb3bcb1, 0.35, 0.42, { env: 0.75 }), // 쇼룸 시로코팬_1 연회녹 도장
+    imp: FC.galvLight
+  };
+  function glbFan(kind, s) {
+    const o = GLB[kind], fb = M.fan(o.fb, s), g = new T.Group();
+    g.add(fb.group);
+    loadGlb(o.url).then(src => {
+      const m = src.clone(true), k = s * 0.95 / o.h;
+      m.scale.setScalar(k);
+      const imp = m.getObjectByName('impeller');
+      m.traverse(x => {
+        if (!x.isMesh) return;
+        let isImp = false; for (let p = x; p; p = p.parent) if (p === imp) isImp = true;
+        x.material = o.sus ? FC.sus : isImp ? GLB_M.imp : GLB_M.paint;
+        x.castShadow = true;
+        // 날개: 앱이 돌리는 fb.rotor(프록시) 각도를 따라 x 축으로 회전.
+        // 배기 시 + 방향 = 바퀴 위쪽이 앞(+z, 토출구)으로 도는 쪽 — 스크롤 토출 방향과 같음
+        if (isImp && imp && fb.rotor) x.onBeforeRender = () => { imp.rotation.x = fb.rotor.rotation.z; };
+      });
+      g.remove(fb.group); g.add(m);
+    }).catch(e => console.warn('3D 모델을 불러오지 못해 기본 형상을 씁니다:', o.url, e && e.message));
+    return { group: g, rotor: fb.rotor, axis: fb.axis };
+  }
   M.fan = function (kind, s) {
+    if (GLB[kind]) return glbFan(kind, s);
     const g = new T.Group();
     let rotor = null, axis = 'z';
     if (kind === 'propeller' || kind === 'propellerDark' || kind === 'propStand') {
