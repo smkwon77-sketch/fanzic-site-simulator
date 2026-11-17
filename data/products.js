@@ -10,13 +10,13 @@ window.FZ = window.FZ || {};
 
 FZ.PRODUCTS = {
   /* ---------- 시로코팬 (CENTRIFUGAL FANS) ---------- */
-  mini_sirocco: { name: '미니&멀티 시로코팬', model: 'TFB-F10 AS', group: '시로코팬', model3d: 'sirocoBox', role: 'exhaust', mount: 'duct', size: 0.32,
+  mini_sirocco: { name: '미니&멀티 시로코팬', model: 'TFB-F10 AS', group: '시로코팬', model3d: 'glbF28', role: 'exhaust', mount: 'duct', size: 0.32,
     airflow: 201, power: 32, pressure: '10mmAq', eff: 0.75,
     features: ['소형 공간 단독 급·배기 (미니)', '흡입 플랜지 2~3개로 여러 곳 동시 배기 (멀티)', '정압이 약한 천장형 환풍기 보완'] },
-  small_sirocco: { name: '소형 시로코팬', model: 'TFB-F19 DS', group: '시로코팬', model3d: 'sirocoBox', role: 'exhaust', mount: 'duct', size: 0.5, extra: true,
+  small_sirocco: { name: '소형 시로코팬', model: 'TFB-F19 DS', group: '시로코팬', model3d: 'glbF28', role: 'exhaust', mount: 'duct', size: 0.5, extra: true,
     airflow: 1400, power: 250, pressure: '21mmAq', eff: 0.75,
     features: ['저소음형 날개·케이싱', '모터·팬 직결형으로 소형·경량', '설치 상태로 모터·날개 분리 점검'] },
-  sus_sirocco: { name: '소형 시로코팬 SUS', model: 'TFB-F19 DS-S', group: '시로코팬', model3d: 'centrifugalSus', role: 'exhaust', mount: 'duct', size: 0.5,
+  sus_sirocco: { name: '소형 시로코팬 SUS', model: 'TFB-F19 DS-S', group: '시로코팬', model3d: 'glbF28Sus', role: 'exhaust', mount: 'duct', size: 0.5,
     airflow: 1400, power: 250, pressure: '21mmAq', eff: 0.75,
     features: ['스테인리스(SUS) 재질 – 부식 환경 대응', '주방·병원·수영장 등 습한 곳', '저소음'] },
   large_sirocco: { name: '대형 시로코팬', model: 'TFB-G31 FS', group: '시로코팬', model3d: 'sirocoFrame', role: 'exhaust', mount: 'duct', size: 0.75,

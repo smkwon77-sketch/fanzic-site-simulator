@@ -8,9 +8,9 @@ window.FZ = window.FZ || {};
 FZ.TAGS = {
   /* 시로코팬 */
   mini_sirocco:   { solves: ['humid', 'odor', 'co2'], dirs: ['exhaust', 'intake'], def: 'exhaust', area: [3, 300], quiet: 1, image: 'multi_sirocco.jpg' },
-  small_sirocco:  { solves: ['humid', 'odor', 'co2', 'heat'], dirs: ['exhaust', 'intake'], def: 'exhaust', area: [20, 1500], quiet: 1, image: null },
+  small_sirocco:  { solves: ['humid', 'odor', 'co2', 'heat'], dirs: ['exhaust', 'intake'], def: 'exhaust', area: [20, 1500], quiet: 1, image: 'sirocco_small.jpg' },
   sus_sirocco:    { solves: ['humid', 'odor', 'gas'], dirs: ['exhaust', 'intake'], def: 'exhaust', area: [20, 1500], corrosion: 1, oily: 1, image: 'sirocco_sus.jpg' },
-  large_sirocco:  { solves: ['heat', 'dust', 'gas', 'odor'], dirs: ['exhaust', 'intake'], def: 'exhaust', area: [150, 5000], image: null },
+  large_sirocco:  { solves: ['heat', 'dust', 'gas', 'odor'], dirs: ['exhaust', 'intake'], def: 'exhaust', area: [150, 5000], image: 'sirocco_large.jpg' },
   blower_fixed:   { solves: ['dust', 'gas'], dirs: ['exhaust', 'intake'], def: 'exhaust', area: [200, 10000], loud: 1, image: null },
   blower_dry:     { solves: ['humid', 'heat', 'co2'], dirs: ['exhaust', 'intake'], def: 'exhaust', area: [30, 2000], quiet: 1, image: 'sirocco.jpg' },
   double_sirocco: { solves: ['odor', 'co2', 'heat', 'humid'], dirs: ['exhaust', 'intake'], def: 'exhaust', area: [50, 2000], quiet: 1, oily: 1, image: 'sirocco_double.jpg' },
